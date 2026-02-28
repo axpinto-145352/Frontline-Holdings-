@@ -16,7 +16,7 @@ This review covers a complete payment automation system designed to eliminate du
 
 | Priority | Finding | Lens | Confidence | Effort | Impact |
 |----------|---------|------|------------|--------|--------|
-| CRITICAL | SmoothX and n8n both writing to QBO could create conflicts/double entries | Data Integrity | HIGH | Med | High |
+| ~~CRITICAL~~ **RESOLVED** | SmoothX and n8n both writing to QBO could create conflicts/double entries — **RESOLVED: Architecture now enforces that n8n NEVER writes vendor bills to QBO. SmoothX owns bill sync. n8n writes only customer invoices.** | Data Integrity | HIGH | Med | High |
 | CRITICAL | No error handling or retry logic in n8n workflows for API failures | Guardrails | HIGH | Low | High |
 | CRITICAL | OAuth tokens need rotation strategy; no secret management plan | Security | HIGH | Low | High |
 | IMPORTANT | Notion 3 req/sec rate limit could bottleneck during high-volume months | Logistical | HIGH | Med | Med |

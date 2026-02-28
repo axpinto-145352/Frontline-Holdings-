@@ -5,17 +5,27 @@
 **Prepared for:** Frontline Holdings Leadership Team
 **Purpose:** Decision-ready summary of integration options, verified API capabilities, architecture paths, and implementation timeline
 
+**How to read this report:** Sections 1-6, 9-11 are written for the leadership team. Sections 7-8 contain technical implementation details for the development team and can be skipped by non-technical readers.
+
+**Companion files in this repository:**
+- `FRONTLINE-PAYMENT-AUTOMATION.md` — Full technical architecture document
+- `n8n-workflows/` — Importable n8n workflow JSON templates (3 workflows)
+- `notion-2nd-brain/SETUP-GUIDE.md` — Step-by-step Notion database setup guide
+- `REVIEW-ASSESSMENT-REPORT.md` — Prior assessment and review findings
+
 ---
 
 ## 1. Situation Summary
 
-Frontline Holdings is losing an estimated **$720,000+/year** to duplicate and triple payments caused by invoices entering through multiple channels (email, Procore, mail) with no cross-system deduplication. The current stack — Procore (project management), QuickBooks Online (accounting), and SmoothX (Procore-QBO sync middleware) — has no automated layer to catch duplicates, match invoices to commitments, notify PMs, or follow up on unpaid customer invoices.
+Frontline Holdings faces an estimated **$720,000+/year exposure** to duplicate and triple payments. This estimate is based on an industry-standard model: ~500 invoices/month at ~$15,000 average value with a conservative 2% duplicate rate yields ~$150,000/month in potential overpayments, with an industry-average recovery rate of ~60% (40% loss = ~$720K/year). **This figure should be validated with an AP audit of the last 6 months before presenting as confirmed loss to the board.**
+
+The root cause: invoices enter through multiple channels (email, Procore, mail) with no cross-system deduplication. The current stack — Procore (project management), QuickBooks Online (accounting), and SmoothX (Procore-QBO sync middleware) — has no automated layer to catch duplicates, match invoices to commitments, notify PMs, or follow up on unpaid customer invoices.
 
 This report covers:
 1. What each system's API can actually do (verified against official documentation)
 2. Three architecture options with honest trade-offs
 3. A phased implementation roadmap with timelines
-4. Cost comparison across options
+4. Cost comparison across options (including development labor)
 
 ---
 
@@ -36,11 +46,11 @@ This report covers:
 | Get budget views | `GET /rest/v1.0/projects/{id}/budget/views` | Yes |
 | Real-time webhooks | `POST /rest/v1.0/companies/{cid}/webhooks` | Yes |
 
-**Authentication:** OAuth 2.0 Client Credentials grant (DMSA) recommended for automated workflows. Tokens expire every 1.5 hours; n8n handles refresh automatically. All calls require `Procore-Company-Id` header.
+**Authentication:** OAuth 2.0 with two grant types. **Client Credentials** using a Developer Managed Service Account (DMSA) is recommended for automated server-to-server workflows. Authorization Code grant is available for user-interactive flows but is not needed for this project. Procore does NOT use OAuth scopes — permissions are controlled via DMSA project-level settings. Tokens expire every 1.5 hours (5,400 seconds); n8n handles refresh automatically. All calls require `Procore-Company-Id` header.
 
-**Rate limit:** 3,600 requests/hour (can request increase to 14,400).
+**Rate limit:** 3,600 requests/hour (can request increase to 7,200 or 14,400 via apisupport@procore.com). Rate limit headers: `X-Rate-Limit-Remaining`, `X-Rate-Limit-Reset`. Throttled = HTTP 429.
 
-**n8n connection:** No native Procore node. Use HTTP Request node with Generic OAuth2 credentials. Fully functional — we've confirmed the exact configuration parameters.
+**n8n connection:** No native Procore node exists. Use HTTP Request node with Generic OAuth2 credentials. Fully functional — the exact configuration parameters have been verified against Procore's developer documentation.
 
 ### 2.2 QuickBooks Online API
 
@@ -82,6 +92,8 @@ This report covers:
 | Code | Dedup logic, fingerprint hashing, normalization | JavaScript |
 | AI Agent | Claude API for fuzzy matching, vendor normalization | Native |
 | IF / Switch / Merge | Routing, decision logic, data combining | Built-in |
+
+**What is n8n?** An open-source workflow automation platform (similar to Zapier but self-hostable and far more powerful). It connects systems via visual workflows without requiring full custom software development.
 
 **Bottom line:** n8n can talk to every system in the stack. Procore requires HTTP Request (no native node), but everything else has native nodes.
 
@@ -203,15 +215,16 @@ Procore's built-in QBO Connector:    n8n owns:
 | First-party support from Procore | Limited to **1 QBO company** per Procore site |
 | Fastest possible setup for new projects | **No negative invoice support** |
 | | **US-only** payment import (problematic if Frontline operates in Canada) |
-| | No retention/retainage handling |
-| | No progress claim sync |
-| | No attachment sync |
-| | Less comprehensive than SmoothX |
+| | **No retention/retainage handling** |
+| | **No progress claim sync** |
+| | **No attachment sync** |
+| | Less comprehensive than SmoothX overall |
 
 **Cost estimate:**
 - Connector: $0
 - n8n Cloud: ~$50/month or self-hosted
-- Procore Professional Services (for existing projects): Unknown — contact Procore
+- Claude API (AI matching): ~$20-50/month
+- Procore Professional Services (for existing projects): Unknown — contact Procore for a quote before selecting this option
 - Development time: **6-8 weeks** to production
 - Gap-filling for missing features: **Additional 2-4 weeks** if retention/progress claims needed
 
@@ -222,7 +235,7 @@ Procore's built-in QBO Connector:    n8n owns:
 | Factor | Option A: Hybrid (SmoothX + n8n) | Option B: n8n Only | Option C: Procore Connector + n8n |
 |--------|----------------------------------|-------------------|-----------------------------------|
 | **Time to production** | 4-6 weeks | 10-14 weeks | 6-8 weeks |
-| **Monthly cost** | ~$300-600 | ~$70-100 | ~$50-100 |
+| **Monthly cost (subscriptions)** | ~$270-600 | ~$70-100 | ~$70-100 |
 | **Dev effort (build)** | Low (dedup/automation only) | Very High (everything) | Medium (dedup + gap-filling) |
 | **Dev effort (maintain)** | Low | High (2-4 hrs/week) | Medium |
 | **Retention/retainage** | Handled by SmoothX | Must build (complex) | Not supported |
@@ -233,17 +246,54 @@ Procore's built-in QBO Connector:    n8n owns:
 | **Financial error risk** | Low (battle-tested sync) | Medium-High (first 6 months) | Medium (feature gaps) |
 | **Vendor lock-in** | SmoothX dependency | None | Procore dependency |
 
+### Total Cost of Ownership — Year 1 (Option A)
+
+| Cost Item | Optimistic | Pessimistic | Notes |
+|-----------|-----------|-------------|-------|
+| **Development labor** | $16,000 | $36,000 | 160-240 hours at $100-150/hr |
+| SmoothX subscription | $2,400 | $6,000 | $200-500/month x 12 |
+| n8n Cloud | $600 | $1,200 | $50-100/month (may need higher tier at scale) |
+| Notion Team plan | $600 | $600 | ~$10/user/month x 5 users |
+| Claude API (AI matching) | $240 | $600 | $20-50/month; could increase if volume grows |
+| PM training time | $500 | $2,000 | 2-5 hours per PM during first month |
+| Parallel run / QA (Finance staff time) | $1,000 | $3,000 | 2-4 weeks of verification |
+| 20% contingency | $4,268 | $9,880 | Standard project buffer |
+| **Year 1 Total** | **$25,608** | **$59,280** | |
+| **Monthly run-rate after Year 1** | **$320** | **$650** | Subscriptions only (dev labor drops off) |
+
+**Note:** Development labor is the largest cost and is a one-time expense. After go-live, the monthly run-rate drops to $320-650/month. At even a 1% reduction in duplicate payments, the system saves $7,500/month — paying for itself within the first month of operation.
+
+### Risk Register
+
+| # | Risk | Likelihood | Impact | Mitigation |
+|---|------|-----------|--------|------------|
+| 1 | **False positive dedup flags** — system flags legitimate invoices as duplicates, PMs learn to ignore alerts | Medium | High | Tune confidence thresholds during pilot; track false positive rate; target <5% false positive rate before rollout |
+| 2 | **SmoothX + n8n dual-write conflict** — both systems write to QBO, creating the very duplicates the system prevents | Low | Critical | **Architectural constraint: n8n NEVER writes vendor bills to QBO.** SmoothX owns bill sync. n8n writes only customer invoices. Enforce via workflow design. |
+| 3 | **Subcontractor payment delays** — false-positive blocks delay legitimate payments, risking prompt-payment-act violations and lien deadlines | Medium | High | PM override capability on all blocks; maximum hold time of 24 hours before auto-escalation |
+| 4 | **SmoothX vendor dependency** — SmoothX acquired, discontinued, or price increase | Low | High | Option A → B migration path documented; n8n reads from same APIs SmoothX uses, so migration is incremental |
+| 5 | **n8n downtime during month-end close** | Low | High | n8n Cloud includes 99.9% SLA; fallback: manual invoice processing for 24-48 hours; no data loss (Notion retains state) |
+| 6 | **Notion as financial system of record** — auditors question whether Notion meets documentation requirements | Medium | Medium | Consult external auditor before go-live; configure automated Notion database exports (CSV) for backup/retention; establish 7-year data retention policy |
+| 7 | **Data quality issues during vendor import** — duplicate vendors, inconsistent naming across Procore and QBO | High | Medium | Data cleansing step in Phase 1; AI-assisted vendor name normalization; manual review of vendor mapping before go-live |
+| 8 | **PM adoption resistance** — PMs don't trust or use the new system | Medium | High | Executive sponsor required; start with one cooperative PM on pilot; demonstrate value with first caught duplicate; keep PM effort to <1 hour/week |
+
+### Rollback Plan
+
+If the system creates more problems than it solves at any phase:
+1. **Phase 1-2:** Disable n8n webhook triggers. Zero impact — no production data has been modified.
+2. **Phase 3-4:** Disable customer invoice automation. Revert to manual invoicing. Notion data remains as a reference.
+3. **Full rollback:** Disable all n8n workflows. SmoothX continues handling Procore↔QBO sync unaffected (it operates independently). Return to manual invoice processing.
+
 ---
 
 ## 5. Recommended Path: Option A (Hybrid)
 
 ### Why
 
-1. **The duplicate payment problem is the priority.** Every week without the dedup engine is another week of potential $150K+ in overpayments. Option A gets the dedup engine live in 4-6 weeks. Option B delays it by 6-8 weeks because development time is consumed building plumbing that SmoothX already handles.
+1. **The duplicate payment problem is the priority.** Every week without the dedup engine is another week of exposure to overpayments. Option A gets the dedup engine live in 4-6 weeks. Option B delays it by 6-8 weeks because development time is consumed building plumbing that SmoothX already handles. (Note: the dedup engine itself takes the same time in both options — Option B adds 6-8 weeks for the Procore↔QBO sync rebuild on top.)
 
 2. **Retention and progress claims are construction fundamentals.** Frontline operates in commercial construction. Progress billing and retainage are core to the business. Building these from scratch in n8n is a significant engineering effort with high risk of financial errors.
 
-3. **The savings from dropping SmoothX (~$300/month) do not justify the risk.** The annual SmoothX cost (~$3,600-6,000) is a rounding error compared to the $720,000+ annual duplicate payment exposure. Getting the dedup engine live 2 months sooner pays for years of SmoothX.
+3. **The savings from dropping SmoothX (~$200-500/month) do not justify the risk.** The annual SmoothX cost (~$2,400-6,000) is a rounding error compared to the $720,000+ annual duplicate payment exposure. Getting the dedup engine live 2 months sooner pays for years of SmoothX.
 
 4. **You can always migrate later.** Start with Option A. Once the dedup engine is running and proven, revisit whether to bring the Procore↔QBO sync in-house. By then you'll have real data on how complex your financial sync actually is.
 
@@ -270,7 +320,7 @@ Procore's built-in QBO Connector:    n8n owns:
 | Task | Details | Owner |
 |------|---------|-------|
 | Build Workflow 1: Invoice Intake | Webhook trigger (Procore events) + email trigger + manual upload entry point | Dev |
-| Implement fingerprint generator | n8n Code node: SHA256(normalized_vendor + normalized_invoice_num + amount) | Dev |
+| Implement fingerprint generator | n8n Code node: SHA256(normalized_vendor + normalized_invoice_num + amount + project) | Dev |
 | Implement Layer 1-3 dedup checks | Exact fingerprint match (Notion), fuzzy match (vendor similarity + amount + date window), amount+vendor pattern match | Dev |
 | Implement Layer 4: Procore cross-reference | Query Procore commitments — flag if total payments exceed committed amount | Dev |
 | Implement Layer 5: AI analysis | Claude API call via n8n AI Agent node — analyze suspicious patterns | Dev |
@@ -434,37 +484,50 @@ Five interconnected databases serve as the single source of truth:
 | # | Decision | Options | Impact |
 |---|----------|---------|--------|
 | 1 | **Which architecture?** | A (Hybrid — recommended), B (n8n only), or C (Procore connector + n8n) | Timeline, cost, and risk profile |
-| 2 | **n8n hosting?** | Cloud (~$50/mo, managed) vs. self-hosted (free, you manage server) | IT overhead |
-| 3 | **Pilot project selection** | Which active project to test on first? | Ideally medium complexity with cooperative subs |
-| 4 | **PM approval method** | Email links, Notion buttons, or Slack integration? | UX for PMs |
-| 5 | **Customer invoice format** | QBO native email, custom PDF template, or both? | Customer-facing presentation |
-| 6 | **Follow-up timing** | Net 30/45/60 default? Per-customer? | Collections aggressiveness |
-| 7 | **AI model for matching** | Claude (recommended for accuracy) vs. GPT-4 (alternative) | Cost, accuracy |
-| 8 | **Who maintains n8n long-term?** | In-house developer, contractor, or managed service? | Sustainability |
+| 2 | **Executive sponsor** | Who owns this initiative? (VP of Ops, CFO, Controller?) | Accountability and PM adoption |
+| 3 | **Project budget approval** | Optimistic: ~$26K / Pessimistic: ~$59K (see Year 1 TCO table) | Financial authorization |
+| 4 | **n8n hosting?** | Cloud (~$50/mo, managed) vs. self-hosted (free, you manage server) | IT overhead |
+| 5 | **Pilot project selection** | Which active project to test on first? | Ideally medium complexity with cooperative PM and subs |
+| 6 | **PM approval method** | Email links, Notion buttons, or Slack integration? | UX for PMs |
+| 7 | **Customer invoice format** | QBO native email, custom PDF template, or both? | Customer-facing presentation |
+| 8 | **Follow-up timing** | Net 30/45/60 default? Per-customer? | Collections aggressiveness |
+| 9 | **AI model for matching** | Claude (recommended for accuracy — used throughout this spec) vs. GPT-4 (alternative) | Cost, accuracy |
+| 10 | **Who maintains n8n long-term?** | In-house developer, contractor, or managed service? Assign by name. | Sustainability |
+| 11 | **Parallel run duration** | How long do old + new processes run side-by-side? (Recommended: 2-4 weeks) | Rollback safety |
+| 12 | **Go/no-go criteria for pilot** | What metrics must be met before full rollout? (e.g., <5% false positive rate, zero missed invoices for 2 weeks) | Objective success definition |
+| 13 | **Notion as financial record** | Consult external auditor — is Notion acceptable for 7-year financial audit trail retention? | Compliance |
+
+**Target decision date:** These decisions are needed before development can begin. Every week of delay extends the timeline by one week and continues the duplicate payment exposure.
 
 ---
 
 ## 10. Expected Outcomes
 
-| Metric | Current State | After Implementation |
-|--------|--------------|---------------------|
-| Duplicate payment rate | ~2% (est. $150K/month exposure) | <0.1% (automated blocking) |
-| Invoice processing time | 2-5 days (manual matching) | <4 hours (automated) |
-| PM time on invoice admin | 5-10 hours/week | <1 hour/week (review alerts only) |
-| Customer invoice turnaround | 3-7 days after approval | Same day (automated) |
-| Follow-up on overdue invoices | Ad hoc / inconsistent | Automated 3-tier escalation |
-| Financial visibility | Fragmented across 3+ systems | Single Notion dashboard |
-| Audit trail | Partial / manual | Complete automated log |
+| Metric | Current State | 90-Day Target | 6-Month Target | How Measured |
+|--------|--------------|---------------|----------------|-------------|
+| Duplicate payment rate | ~2% (est. — validate with AP audit) | Reduce by 80% | Reduce by 90%+ | Count of duplicates caught vs. total invoices processed |
+| Invoice processing time | 2-5 days (manual matching) | <8 hours (receipt to QBO entry) | <4 hours | Timestamp difference: Notion "Received" to "Matched" |
+| PM time on invoice admin | 5-10 hours/week | 3-5 hours/week (learning curve) | <1 hour/week | PM self-report + Notion activity logs |
+| Customer invoice turnaround | 3-7 days after approval | Same day for high-confidence matches | Same day for all matches | Timestamp: PM approval to customer email sent |
+| Follow-up on overdue invoices | Ad hoc / inconsistent | Automated 3-tier escalation | Automated with <2% missed | Notion follow-up count vs. overdue invoice count |
+| Financial visibility | Fragmented across 3+ systems | Single Notion dashboard (near-real-time, subject to SmoothX sync delay) | Fully operational dashboards | Dashboard availability + data freshness |
+| Audit trail | Partial / manual | Complete automated log for all n8n-processed invoices | 100% coverage | Audit Log database completeness |
+
+**90-day review checkpoint:** At 90 days post-pilot, the executive sponsor and development lead review these metrics against targets and decide whether to proceed with full rollout, adjust thresholds, or pause.
 
 ---
 
 ## 11. Next Steps
 
-1. **Team reviews this report** and selects architecture option (A, B, or C)
-2. **Decide on the 8 open questions** in Section 9
-3. **Register a Procore Developer App** (needed for API access regardless of option chosen)
-4. **Select a pilot project** and identify the PM who will be the first user
-5. **Begin Phase 1** — Notion workspace setup + n8n instance + OAuth connections
+1. **Assign an executive sponsor** — someone who will own this initiative and drive PM adoption
+2. **Conduct a limited AP audit** (last 6 months) to validate the duplicate payment rate and establish a measured baseline
+3. **Team reviews this report** and selects architecture option (A, B, or C)
+4. **Decide on the 13 open questions** in Section 9 — target decision date: within 1 week
+5. **Register a Procore Developer App** (Admin task — needed for API access regardless of option chosen)
+6. **Select a pilot project** and identify the PM who will be the first user
+7. **Assign the development resource by name** — in-house, contractor, or managed service
+8. **Begin Phase 1** — Notion workspace setup + n8n instance + OAuth connections
+9. **Schedule weekly check-ins** during implementation (recommended: 30-minute weekly standup with sponsor, dev lead, and pilot PM)
 
 ---
 

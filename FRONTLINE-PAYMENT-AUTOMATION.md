@@ -25,7 +25,7 @@
 
 ## 1. Executive Summary
 
-Frontline Holdings, a construction/general contracting company, is experiencing **critical financial losses from duplicate and triple payments** due to disconnected systems between their project management (Procore), accounting (QuickBooks Online), and ERP (SmoothX). This document outlines a complete automation system using **n8n workflow automation** as the orchestration layer, **Notion as a 2nd Brain/source of truth**, and **AI-powered matching logic** to eliminate duplicate payments and streamline the invoice-to-payment lifecycle.
+Frontline Holdings, a construction/general contracting company, is experiencing **critical financial losses from duplicate and triple payments** due to disconnected systems between their project management (Procore), accounting (QuickBooks Online), and integration middleware (SmoothX). This document outlines a complete automation system using **n8n workflow automation** as the orchestration layer, **Notion as a 2nd Brain/source of truth**, and **AI-powered matching logic** to eliminate duplicate payments and streamline the invoice-to-payment lifecycle.
 
 ### Key Outcomes
 - **Eliminate 100% of duplicate/triple payments** through automated deduplication
@@ -64,7 +64,7 @@ Frontline Holdings operates in the construction industry as a **general contract
 |--------|---------|--------|
 | **Procore** | Project management, commitments, change orders, pay applications | Primary PM tool |
 | **QuickBooks Online (QBO)** | Accounting, AP/AR, general ledger | Primary accounting |
-| **SmoothX** | ERP layer for construction operations | Operational ERP |
+| **SmoothX** | Integration middleware (Procore↔QBO sync) | Operational sync layer |
 | **Email** | Invoice receipt, PM communication, customer invoicing | Manual process |
 
 ### Current Pain Points
@@ -321,8 +321,8 @@ SELECT * FROM Bill WHERE VendorRef = '{vendor_id}'
 ```
 +------------------+     +------------------+     +------------------+
 |                  |     |                  |     |                  |
-|    PROCORE       |     |   QUICKBOOKS     |     |   SmoothX ERP   |
-|  (Project Mgmt) |     |   ONLINE (QBO)   |     |  (Operations)   |
+|    PROCORE       |     |   QUICKBOOKS     |     |    SmoothX      |
+|  (Project Mgmt) |     |   ONLINE (QBO)   |     |  (Sync Layer)   |
 |                  |     |  (Accounting)    |     |                  |
 +--------+---------+     +--------+---------+     +--------+---------+
          |                        |                        |
@@ -502,17 +502,13 @@ TRIGGER: Receives clean (non-duplicate) invoice from Workflow 1
                PM Review]     Manual Match]
     |
     v
-[Create Bill in QBO]
-  - POST /v3/company/{id}/bill
-  - Vendor ref, amount, line items
-  - Custom field: procore_commitment_id
-  - Custom field: procore_project_id
+[NOTE: n8n does NOT create bills in QBO — SmoothX owns that sync.
+ n8n logs the match and notifies the PM.]
     |
     v
 [Create Notion Entry]
   - Invoice #, Vendor, Amount
   - Procore Commitment Ref
-  - QBO Bill ID
   - Match Confidence
   - Status: "Matched - Pending Approval"
   - Fingerprint hash
@@ -784,10 +780,10 @@ Respond with:
 ### 9.1 Procore OAuth Setup
 
 ```
-Authorization URL: https://login.procore.com/oauth/authorize
+Grant Type: Client Credentials (recommended for n8n automation)
 Token URL: https://login.procore.com/oauth/token
-Scope: Read access to projects, commitments, vendors, invoices
-Redirect URI: {n8n_webhook_url}/procore/callback
+Scope: N/A (Procore does NOT use OAuth scopes — permissions controlled via DMSA)
+Required Header: Procore-Company-Id: {company_id}
 ```
 
 **Required Procore API Calls:**
@@ -941,8 +937,15 @@ function normalizeInvoiceNum(num) {
     .trim();
 }
 
-function generateFingerprint(vendor, invoiceNum, amount) {
-  const normalized = `${normalizeVendor(vendor)}|${normalizeInvoiceNum(invoiceNum)}|${parseFloat(amount).toFixed(2)}`;
+function normalizeProject(project) {
+  return project
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+}
+
+function generateFingerprint(vendor, invoiceNum, amount, project) {
+  const normalized = `${normalizeVendor(vendor)}|${normalizeInvoiceNum(invoiceNum)}|${parseFloat(amount).toFixed(2)}|${normalizeProject(project)}`;
   return crypto.createHash('sha256').update(normalized).digest('hex');
 }
 
@@ -951,7 +954,8 @@ const invoice = $input.first().json;
 const fingerprint = generateFingerprint(
   invoice.vendor_name,
   invoice.invoice_number,
-  invoice.amount
+  invoice.amount,
+  invoice.project_name
 );
 
 return [{
@@ -998,7 +1002,7 @@ return [{
 - [ ] Test end-to-end flow: receive -> match -> invoice -> follow-up
 
 ### Phase 5: Polish & Launch (Weeks 9-10)
-- [ ] Connect SmoothX ERP data feed
+- [ ] Connect SmoothX sync layer data feed
 - [ ] Historical data migration into Notion
 - [ ] PM training on Notion dashboard
 - [ ] Parallel run: old process + new system
@@ -1136,7 +1140,7 @@ Frontline Holdings
 
 ## Appendix B: SmoothX Integration Notes
 
-SmoothX serves as Frontline's operational ERP. Integration approach:
+SmoothX serves as Frontline's integration middleware (Procore↔QBO sync layer). Integration approach:
 
 ### If SmoothX Has REST API:
 - Use n8n HTTP Request node to query job costing data

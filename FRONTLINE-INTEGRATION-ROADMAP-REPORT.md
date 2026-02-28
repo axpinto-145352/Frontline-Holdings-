@@ -275,7 +275,8 @@ Procore's built-in QBO Connector:    n8n owns:
 | **Proposal mapping** | **Option 1: Gap-Filler** | **Option 2: Gap-Filler + 2nd Brain** | **Option 3: Full Replacement** | Not proposed |
 | **Proposal price** | **$14,000** | **$22,000** | **$42,000** | N/A |
 | **Time to production** | 8 weeks | 12 weeks | 20 weeks | 6-8 weeks |
-| **Monthly cost (subs)** | ~$70-150 | ~$320-700 | ~$120-200 | ~$70-100 |
+| **New monthly costs** | ~$70-150 | ~$120-200 | ~$120-200 | ~$70-100 |
+| **Total monthly (incl. SmoothX)** | ~$270-650 | ~$320-700 | ~$120-200 | ~$70-100 |
 | **Dev effort (build)** | Low | Medium | Very High | Medium |
 | **Dev effort (maintain)** | Low (~1 hr/week) | Low (~1 hr/week) | High (2-4 hrs/week) | Medium |
 | **Notion dashboards** | No | Yes (6 databases, 6 views) | Yes (6+ databases) | No |
@@ -301,7 +302,7 @@ Procore's built-in QBO Connector:    n8n owns:
 | **Year 1 Total** | **$17,240-21,800** | **$25,840-30,400** | **$43,440-44,400** |
 | **Monthly run-rate after Year 1** | **$270-650** | **$320-700** | **$120-200** |
 
-**Note:** Development fees are one-time fixed project costs as quoted in the proposal. After go-live, the monthly run-rate drops to subscriptions only. At even a 1% reduction in duplicate payments, the system saves $7,500/month — paying for itself within the first 2-3 months regardless of option chosen.
+**Note:** Development fees are one-time fixed project costs as quoted in the proposal. After go-live, the monthly run-rate drops to subscriptions only. Even catching just one duplicate payment per month ($15,000 average) pays for the system within the first 1-3 months regardless of option chosen.
 
 ### Risk Register
 
@@ -508,7 +509,7 @@ TRIGGER: Notion status changed to "Approved"
 
 ## 8. Notion "2nd Brain" — What Gets Tracked
 
-Six interconnected databases serve as the single source of truth:
+Six interconnected databases serve as the 2nd source of truth (Procore and QBO remain the systems of record for financial transactions):
 
 | Database | Key Fields | Purpose |
 |----------|-----------|---------|
@@ -519,12 +520,13 @@ Six interconnected databases serve as the single source of truth:
 | **Audit Log** | Timestamp, Action, Invoice, Performed By, System | Complete history of every system action |
 | **Payments** | Payment Reference, Invoice, Vendor, Amount, Payment Date, Method, QBO Payment ID, Cleared, Potential Duplicate | Payment tracking with duplicate flagging |
 
-**Pre-built views:**
+**Pre-built views (6 total):**
 - PM Dashboard — each PM's pending approvals + overdue items
 - Duplicate Alert Board — all flagged duplicates needing review
 - Cash Flow Board — outstanding receivables by customer
 - Project Financial Summary — per-project billing status
 - Vendor Payment History — all payments to each vendor (dedup verification)
+- Audit Trail — complete history of all system actions (from Audit Log database)
 
 ---
 

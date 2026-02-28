@@ -40,7 +40,7 @@ Frontline Holdings, a construction/general contracting company, is experiencing 
 - **Customer invoice automation** with 3-tier escalation for overdue invoices
 
 ### Additional Outcomes (Options 2 & 3)
-- **Single source of truth** in Notion for all payment status tracking
+- **Centralized 2nd source of truth** in Notion for all payment status tracking
 - **Real-time dashboards** for PMs, Finance, and Leadership
 - **Full audit trail database** from invoice receipt to customer payment
 
@@ -366,7 +366,7 @@ SELECT * FROM Bill WHERE VendorRef = '{vendor_id}'
 |                  |     |                  |     |                  |
 |   NOTION         |     |     EMAIL        |     |   AI ENGINE     |
 |   (2nd Brain)    |     | (Gmail/SMTP)     |     |  (Claude API)   |
-|   Source of Truth |     |                  |     |                  |
+|   2nd Brain       |     |                  |     |                  |
 +------------------+     +------------------+     +------------------+
 ```
 
@@ -401,12 +401,12 @@ Step 4: MATCH TO PROCORE COMMITMENT
     - Amount within commitment remaining
     - Cost code alignment
        |
-Step 5: CREATE/UPDATE IN QBO
-  Create Bill in QBO linked to vendor
-  Attach Procore commitment reference
-  Set approval status = "Pending PM Review"
+Step 5: VERIFY IN QBO (READ-ONLY)
+  Query QBO for existing bill (SmoothX creates vendor bills — n8n does NOT)
+  Cross-reference Procore commitment with QBO bill record
+  Confirm bill exists and amounts match
        |
-Step 6: LOG IN NOTION (Source of Truth)
+Step 6: LOG IN NOTION (2nd Brain)
   Create entry in Invoice Tracker database:
     - Invoice #, Vendor, Amount, Project
     - Procore Commitment Ref
@@ -618,7 +618,7 @@ TRIGGER: n8n Cron - runs daily
 
 ### Database Architecture
 
-The Notion workspace serves as the **single source of truth** — the "2nd Brain" that every system writes to and reads from.
+The Notion workspace serves as the **2nd source of truth** — the "2nd Brain" that aggregates data from Procore and QBO into a unified operational dashboard. Procore and QBO remain the systems of record for financial transactions; Notion provides centralized visibility, dashboards, and an audit trail.
 
 ### Database 1: Invoice Tracker (Master)
 
@@ -858,21 +858,14 @@ GET https://quickbooks.api.intuit.com/v3/company/{realmId}/query
          AND TxnDate>='{start_date}'
 Headers: { Authorization: "Bearer {token}" }
 
-// 2. Create vendor bill
-POST https://quickbooks.api.intuit.com/v3/company/{realmId}/bill
-Body: {
-  "VendorRef": { "value": "{vendor_id}" },
-  "Line": [{
-    "Amount": {amount},
-    "DetailType": "AccountBasedExpenseLineDetail",
-    "AccountBasedExpenseLineDetail": {
-      "AccountRef": { "value": "{expense_account_id}" }
-    }
-  }],
-  "TxnDate": "{invoice_date}",
-  "DocNumber": "{invoice_number}",
-  "PrivateNote": "Procore Commitment: {commitment_id}"
-}
+// 2. Query existing vendor bill (READ-ONLY — SmoothX creates bills, n8n does NOT)
+// n8n uses this to cross-reference and verify bills created by SmoothX
+GET https://quickbooks.api.intuit.com/v3/company/{realmId}/query
+  ?query=SELECT * FROM Bill WHERE DocNumber='{invoice_number}'
+         AND VendorRef='{vendor_id}'
+Headers: { Authorization: "Bearer {token}" }
+// NOTE: For Option 3 (Full Replacement), n8n replaces SmoothX and DOES create
+// vendor bills. The POST /bill endpoint is used only in Option 3.
 
 // 3. Create customer invoice
 POST https://quickbooks.api.intuit.com/v3/company/{realmId}/invoice

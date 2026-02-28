@@ -54,7 +54,7 @@ This proposal presents three engagement options. Each is self-contained and deli
 | **Dashboards** | Procore + QBO native reporting | Real-time Notion dashboards | Real-time Notion dashboards |
 | **Audit trail** | n8n execution logs + QBO records | Full Notion audit database | Full Notion audit database |
 | **Customer invoicing** | Automated via QBO | Automated via QBO | Automated via QBO |
-| **Monthly run-rate** | ~$70-150/mo | ~$320-650/mo | ~$120-250/mo |
+| **Monthly run-rate (new costs)** | ~$70-150/mo | ~$120-200/mo | ~$120-200/mo |
 | **Fixed project fee** | **$14,000** | **$22,000** | **$42,000** |
 | **Timeline** | 8 weeks | 12 weeks | 20 weeks |
 | **Risk level** | Low | Low | Medium-High (first 6 months) |
@@ -259,7 +259,7 @@ Dashboards: 6 Notion views (PM, Duplicates, Cash Flow, Project, Vendor, Audit)
 
 **Payment schedule:** 4 milestone payments of $5,500 (kickoff, Phase 2 complete, Phase 3 complete, full rollout)
 
-**Monthly run-rate after go-live:** ~$320-650/month (n8n Cloud ~$50-100 + Notion Team ~$50/mo + Claude API ~$20-50 + SmoothX subscription continues as-is)
+**Monthly run-rate after go-live (new costs only):** ~$120-200/month (n8n Cloud ~$50-100 + Notion Team ~$50 + Claude API ~$20-50). SmoothX subscription continues as-is (~$200-500/mo existing cost).
 
 ---
 
@@ -343,7 +343,7 @@ No SmoothX dependency. Full control. Full responsibility.
 
 **Payment schedule:** 6 milestone payments of $7,000 (kickoff, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6)
 
-**Monthly run-rate after go-live:** ~$120-250/month (n8n Cloud ~$50-100 + Notion Team ~$50/mo + Claude API ~$20-50). SmoothX subscription eliminated.
+**Monthly run-rate after go-live:** ~$120-200/month (n8n Cloud ~$50-100 + Notion Team ~$50 + Claude API ~$20-50). SmoothX subscription eliminated.
 
 ### Important Considerations for Option 3
 
@@ -488,7 +488,7 @@ Week 17-20  ░░░░░░░░██████████████�
 | SmoothX dependency | Full | Full | Full | 1, 2 |
 | SmoothX dependency | Full | Parallel run | Eliminated | 3 |
 
-**Conservative ROI estimate (all options):** At a 1% reduction in duplicate payments (half the estimated 2% rate), the system saves approximately **$7,500/month** in prevented overpayments. Even Option 1 at $14,000 pays for itself in **under 2 months**.
+**Conservative ROI estimate (all options):** Even catching just **one duplicate payment per month** at the $15,000 average invoice value saves $15,000/month — meaning even Option 1 at $14,000 pays for itself **in the first month**. At the estimated 2% duplicate rate (~10 duplicates/month), the potential savings are **$150,000/month**.
 
 ---
 

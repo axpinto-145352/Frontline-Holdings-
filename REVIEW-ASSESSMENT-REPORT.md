@@ -25,15 +25,15 @@ This review covers a complete payment automation system designed to eliminate du
 | Priority | Finding | Lens | Confidence | Effort | Impact |
 |----------|---------|------|------------|--------|--------|
 | ~~CRITICAL~~ **RESOLVED** | SmoothX and n8n both writing to QBO could create conflicts/double entries — **RESOLVED: Architecture now enforces that n8n NEVER writes vendor bills to QBO. SmoothX owns bill sync. n8n writes only customer invoices.** | Data Integrity | HIGH | Med | High |
-| CRITICAL | No error handling or retry logic in n8n workflows for API failures | Guardrails | HIGH | Low | High |
-| CRITICAL | OAuth tokens need rotation strategy; no secret management plan | Security | HIGH | Low | High |
+| CRITICAL | No error handling or retry logic in n8n workflows for API failures *(All options)* | Guardrails | HIGH | Low | High |
+| CRITICAL | OAuth tokens need rotation strategy; no secret management plan *(All options)* | Security | HIGH | Low | High |
 | IMPORTANT | Notion 3 req/sec rate limit could bottleneck during high-volume months *(Options 2/3 only)* | Logistical | HIGH | Med | Med |
-| IMPORTANT | No rollback mechanism if QBO bill creation succeeds but Notion logging fails *(Options 2/3 only)* | Guardrails | HIGH | Med | High |
-| IMPORTANT | AI matching adds latency + cost per invoice; no fallback if API is down | Cost | MEDIUM | Med | Med |
+| IMPORTANT | No rollback mechanism if QBO customer invoice creation succeeds but Notion logging fails *(Options 2/3 only)* | Guardrails | HIGH | Med | High |
+| IMPORTANT | AI matching adds latency + cost per invoice; no fallback if API is down *(All options)* | Cost | MEDIUM | Med | Med |
 | IMPORTANT | PM approval via Notion requires PMs to adopt Notion — change management risk *(Options 2/3 only; Option 1 uses email-only approvals)* | Client UX | HIGH | High | High |
 | IMPORTANT | Option 3 (Full Replacement): Retention/retainage and progress claim logic is complex and carries medium-high financial error risk during first 6 months *(Option 3 only)* | Data Integrity | HIGH | High | Critical |
-| NICE-TO-HAVE | No monitoring dashboard for n8n workflow execution health | Maintainability | HIGH | Low | Med |
-| NICE-TO-HAVE | Email templates use inline HTML — consider templating engine | Maintainability | MEDIUM | Low | Low |
+| NICE-TO-HAVE | No monitoring dashboard for n8n workflow execution health *(All options)* | Maintainability | HIGH | Low | Med |
+| NICE-TO-HAVE | Email templates use inline HTML — consider templating engine *(All options)* | Maintainability | MEDIUM | Low | Low |
 | NICE-TO-HAVE | Retainage tracking not addressed in n8n dedup/automation layer *(Options 1/2 — SmoothX handles retainage. Option 3 includes retainage build.)* | Future Strategy | HIGH | Med | Med |
 
 ---
@@ -265,16 +265,16 @@ This system addresses a **real, expensive problem** ($150K-720K/year in duplicat
 
 | Metric | Before | After |
 |--------|--------|-------|
-| Duplicate payments/month | 5-15 | 0-1 |
+| Duplicate payments/month | 5-10 | 0-1 |
 | Invoice processing time | 15 min/invoice | 2 min/invoice |
 | PM hours on invoice routing | 40 hrs/month | 8 hrs/month |
 | Customer follow-up consistency | Manual/sporadic | Automated/100% |
 | Financial visibility | 3 disconnected systems | Improved (Option 1) / Single dashboard (Options 2/3) |
-| Monthly cost of duplicates | $75,000-$225,000 | ~$0-$15,000 |
+| Monthly cost of duplicates | $75,000-$150,000 | ~$0-$15,000 |
 | Monthly system cost | $0 | $70-700 (depending on option) |
 
 ### Bottom Line
 
-Even Option 1 at **$14,000 one-time + $70-150/month** can prevent **$75,000-$225,000/month** in payment errors. This is one of the highest-ROI automation investments available to a construction company. The system design is sound, the SmoothX boundary is resolved, and the phased rollout minimizes risk.
+Even Option 1 at **$14,000 one-time + $70-150/month** can prevent **$75,000-$150,000/month** in payment errors. This is one of the highest-ROI automation investments available to a construction company. The system design is sound, the SmoothX boundary is resolved, and the phased rollout minimizes risk.
 
 See `PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md` for full pricing, timelines, retainer options, and next steps.

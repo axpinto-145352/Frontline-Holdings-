@@ -1,0 +1,192 @@
+{
+  "name": "Frontline - Invoice Intake & Dedup Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "procore-invoice-webhook",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Procore Invoice Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "notes": "Receives Procore webhook events when new invoices/requisitions are created"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Invoice Fingerprint Generator & Normalizer\nconst crypto = require('crypto');\n\nfunction normalizeVendor(name) {\n  return name\n    .toLowerCase()\n    .replace(/\\b(llc|inc|corp|ltd|co|company|enterprises?|services?|group|contractors?)\\b/gi, '')\n    .replace(/[^a-z0-9]/g, '')\n    .trim();\n}\n\nfunction normalizeInvoiceNum(num) {\n  if (!num) return '';\n  return String(num)\n    .replace(/^(inv|invoice|#|no|num|number)[-\\.\\s:#]*/i, '')\n    .replace(/^0+/, '')\n    .trim();\n}\n\nfunction generateFingerprint(vendor, invoiceNum, amount) {\n  const normalized = `${normalizeVendor(vendor)}|${normalizeInvoiceNum(invoiceNum)}|${parseFloat(amount).toFixed(2)}`;\n  return crypto.createHash('sha256').update(normalized).digest('hex');\n}\n\nconst invoice = $input.first().json;\nconst fingerprint = generateFingerprint(\n  invoice.vendor_name,\n  invoice.invoice_number,\n  invoice.amount\n);\n\nreturn [{\n  json: {\n    ...invoice,\n    normalized_vendor: normalizeVendor(invoice.vendor_name),\n    normalized_invoice_num: normalizeInvoiceNum(invoice.invoice_number),\n    fingerprint: fingerprint,\n    processed_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "normalize-fingerprint",
+      "name": "Normalize & Fingerprint",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300],
+      "notes": "Normalizes vendor name, invoice number, and generates SHA256 fingerprint for dedup"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": "={{ $env.NOTION_INVOICE_TRACKER_DB_ID }}",
+        "filterType": "string",
+        "jsonNotice": "",
+        "options": {},
+        "filters": {
+          "filter": {
+            "property": "Fingerprint",
+            "rich_text": {
+              "equals": "={{ $json.fingerprint }}"
+            }
+          }
+        }
+      },
+      "id": "notion-dedup-check",
+      "name": "Notion Dedup Check",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [710, 200],
+      "notes": "Query Notion Invoice Tracker for matching fingerprint"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://quickbooks.api.intuit.com/v3/company/{{ $env.QBO_REALM_ID }}/query",
+        "authentication": "oAuth2",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "=SELECT * FROM Bill WHERE VendorRef = '{{ $json.qbo_vendor_id }}' AND TotalAmt = '{{ $json.amount }}' AND TxnDate >= '{{ $json.date_range_start }}'"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "qbo-dedup-check",
+      "name": "QBO Dedup Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [710, 400],
+      "notes": "Query QBO for matching bills (same vendor + amount + date range)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $node['Notion Dedup Check'].json.results && $node['Notion Dedup Check'].json.results.length > 0 }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "is-duplicate",
+      "name": "Is Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [940, 300],
+      "notes": "Check if fingerprint was found in Notion or matching bill exists in QBO"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": "={{ $env.NOTION_INVOICE_TRACKER_DB_ID }}",
+        "title": "={{ $json.invoice_number }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Fingerprint",
+              "richTextValue": "={{ $json.fingerprint }}"
+            },
+            {
+              "key": "Vendor",
+              "selectValue": "={{ $json.vendor_name }}"
+            },
+            {
+              "key": "Amount",
+              "numberValue": "={{ $json.amount }}"
+            },
+            {
+              "key": "Status",
+              "selectValue": "Duplicate Detected"
+            },
+            {
+              "key": "Entry Source",
+              "selectValue": "={{ $json.source || 'Procore' }}"
+            }
+          ]
+        }
+      },
+      "id": "notion-log-duplicate",
+      "name": "Log Duplicate in Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [1170, 200],
+      "notes": "Create Notion entry marked as DUPLICATE DETECTED"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.pm_email }}",
+        "subject": "=⚠️ DUPLICATE Invoice Detected - {{ $json.vendor_name }} #{{ $json.invoice_number }}",
+        "emailType": "html",
+        "message": "=<h2>Duplicate Invoice Detected</h2>\n<p>Our automated system has detected a <strong>potential DUPLICATE invoice</strong>:</p>\n<table border='1' cellpadding='8'>\n<tr><td><strong>Vendor</strong></td><td>{{ $json.vendor_name }}</td></tr>\n<tr><td><strong>Invoice #</strong></td><td>{{ $json.invoice_number }}</td></tr>\n<tr><td><strong>Amount</strong></td><td>${{ $json.amount }}</td></tr>\n<tr><td><strong>Project</strong></td><td>{{ $json.project_name }}</td></tr>\n<tr><td><strong>Match Type</strong></td><td>{{ $json.match_type }}</td></tr>\n<tr><td><strong>Confidence</strong></td><td>{{ $json.confidence }}%</td></tr>\n</table>\n<p><strong>ACTION:</strong> This invoice has been <strong>BLOCKED</strong> from processing.</p>\n<p>If this is NOT a duplicate, override here: <a href='{{ $json.notion_link }}'>Review in Notion Dashboard</a></p>\n<p>— Frontline Payment Automation System</p>",
+        "options": {}
+      },
+      "id": "email-pm-duplicate",
+      "name": "Alert PM - Duplicate",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1400, 200],
+      "notes": "Email PM with duplicate alert details"
+    },
+    {
+      "parameters": {},
+      "id": "continue-to-matching",
+      "name": "Continue to Matching",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1170, 400],
+      "notes": "Routes clean (non-duplicate) invoices to Workflow 2: Matching Engine"
+    }
+  ],
+  "connections": {
+    "Procore Invoice Webhook": {
+      "main": [[{ "node": "Normalize & Fingerprint", "type": "main", "index": 0 }]]
+    },
+    "Normalize & Fingerprint": {
+      "main": [
+        [
+          { "node": "Notion Dedup Check", "type": "main", "index": 0 },
+          { "node": "QBO Dedup Check", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notion Dedup Check": {
+      "main": [[{ "node": "Is Duplicate?", "type": "main", "index": 0 }]]
+    },
+    "QBO Dedup Check": {
+      "main": [[{ "node": "Is Duplicate?", "type": "main", "index": 0 }]]
+    },
+    "Is Duplicate?": {
+      "main": [
+        [{ "node": "Log Duplicate in Notion", "type": "main", "index": 0 }],
+        [{ "node": "Continue to Matching", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log Duplicate in Notion": {
+      "main": [[{ "node": "Alert PM - Duplicate", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "frontline-holdings" },
+    { "name": "payment-automation" },
+    { "name": "dedup" }
+  ]
+}

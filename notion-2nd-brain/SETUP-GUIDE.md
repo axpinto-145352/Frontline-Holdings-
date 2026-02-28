@@ -1,6 +1,10 @@
 # Notion 2nd Brain Setup Guide for Frontline Holdings
 ## Source of Truth — Invoice, Payment & Project Tracking
 
+> **Applies to:** Proposal Option 2 (Gap-Filler + 2nd Brain) and Option 3 (Full Replacement) only.
+> Option 1 (Gap-Filler) does not include Notion — skip this guide if Option 1 is selected.
+> See `PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md` for option details and pricing.
+
 ---
 
 ## Overview

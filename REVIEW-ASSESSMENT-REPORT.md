@@ -4,11 +4,19 @@
 **Mode:** Deep
 **Overall Risk Level:** MEDIUM
 
+> **Engagement options:** This assessment covers the full system architecture (Option 2: Gap-Filler + 2nd Brain). Findings are annotated with option applicability where they differ. See `PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md` for the three engagement options and pricing.
+>
+> | Option | Scope | Price |
+> |--------|-------|-------|
+> | Option 1 — Gap-Filler | n8n fills SmoothX gaps. No Notion. Email-based PM approvals. | $14,000 |
+> | Option 2 — Gap-Filler + 2nd Brain | Option 1 + Notion as 2nd source of truth. Dashboards, audit trail. | $22,000 |
+> | Option 3 — Full Replacement | Option 2 + SmoothX replaced by n8n entirely. | $42,000 |
+
 ---
 
 ## Executive Summary
 
-This review covers a complete payment automation system designed to eliminate duplicate/triple payments at Frontline Holdings, a veteran-owned construction management and GC firm. The system connects Procore (project management), QuickBooks Online (accounting), SmoothX (middleware), and Notion (2nd Brain/source of truth) via n8n workflow automation. The architecture is fundamentally sound, with a strong 5-layer dedup engine and clear data flows. **Top findings:** (1) SmoothX and n8n may overlap on Procore-to-QBO sync causing conflicts, (2) Notion's 3 req/sec rate limit needs careful management at scale, (3) the system lacks disaster recovery for the n8n orchestration layer itself.
+This review covers a complete payment automation system designed to eliminate duplicate/triple payments at Frontline Holdings, a veteran-owned construction management and GC firm. The system connects Procore (project management), QuickBooks Online (accounting), SmoothX (middleware), and Notion (2nd Brain/source of truth — Options 2/3) via n8n workflow automation. The architecture is fundamentally sound, with a strong 5-layer dedup engine and clear data flows. **Top findings:** (1) SmoothX and n8n boundary is now clearly defined — n8n never writes vendor bills to QBO, (2) Notion's 3 req/sec rate limit needs careful management at scale (Options 2/3), (3) Option 3 (Full Replacement) carries medium-high financial error risk during the first 6 months and requires a maintenance retainer.
 
 ---
 
@@ -19,10 +27,11 @@ This review covers a complete payment automation system designed to eliminate du
 | ~~CRITICAL~~ **RESOLVED** | SmoothX and n8n both writing to QBO could create conflicts/double entries — **RESOLVED: Architecture now enforces that n8n NEVER writes vendor bills to QBO. SmoothX owns bill sync. n8n writes only customer invoices.** | Data Integrity | HIGH | Med | High |
 | CRITICAL | No error handling or retry logic in n8n workflows for API failures | Guardrails | HIGH | Low | High |
 | CRITICAL | OAuth tokens need rotation strategy; no secret management plan | Security | HIGH | Low | High |
-| IMPORTANT | Notion 3 req/sec rate limit could bottleneck during high-volume months | Logistical | HIGH | Med | Med |
-| IMPORTANT | No rollback mechanism if QBO bill creation succeeds but Notion logging fails | Guardrails | HIGH | Med | High |
+| IMPORTANT | Notion 3 req/sec rate limit could bottleneck during high-volume months *(Options 2/3 only)* | Logistical | HIGH | Med | Med |
+| IMPORTANT | No rollback mechanism if QBO bill creation succeeds but Notion logging fails *(Options 2/3 only)* | Guardrails | HIGH | Med | High |
 | IMPORTANT | AI matching adds latency + cost per invoice; no fallback if API is down | Cost | MEDIUM | Med | Med |
-| IMPORTANT | PM approval via Notion requires PMs to adopt Notion — change management risk | Client UX | HIGH | High | High |
+| IMPORTANT | PM approval via Notion requires PMs to adopt Notion — change management risk *(Options 2/3 only; Option 1 uses email-only approvals)* | Client UX | HIGH | High | High |
+| IMPORTANT | Option 3 (Full Replacement): Retention/retainage and progress claim logic is complex and carries medium-high financial error risk during first 6 months *(Option 3 only)* | Data Integrity | HIGH | High | Critical |
 | NICE-TO-HAVE | No monitoring dashboard for n8n workflow execution health | Maintainability | HIGH | Low | Med |
 | NICE-TO-HAVE | Email templates use inline HTML — consider templating engine | Maintainability | MEDIUM | Low | Low |
 | NICE-TO-HAVE | Retainage tracking not addressed in current design | Future Strategy | HIGH | Med | Med |
@@ -96,11 +105,17 @@ The system prevents payment errors, benefiting both Frontline and subcontractors
 
 ### 6. Cost Effectiveness — PASS | Confidence: HIGH | Severity: N/A
 
-**ROI Analysis:**
-- Monthly cost: ~$130-150 (n8n $50 + Notion Team $50 + Claude API $30-50)
+**ROI Analysis (by option):**
+
+| | Option 1 | Option 2 | Option 3 |
+|---|---------|---------|---------|
+| Project fee | $14,000 | $22,000 | $42,000 |
+| Monthly run-rate | ~$70-150 | ~$320-700 | ~$120-200 |
+| Months to ROI (at $7,500/mo savings) | <2 months | <3 months | <6 months |
+
 - Preventing ONE duplicate payment saves ~$15,000
 - Annual savings: $150,000-720,000 (industry duplicate rate 1-2.5%)
-- **ROI: 100x-5,000x within the first month**
+- **All options deliver exceptional ROI**
 
 ---
 
@@ -161,15 +176,17 @@ The system prevents payment errors, benefiting both Frontline and subcontractors
 ### 11. Client Experience & Usability — CAUTION | Confidence: HIGH | Severity: 3
 
 **Findings:**
-- Notion adoption is the biggest change management risk
-- Approval workflow is passive (PM must log into Notion)
-- No mobile optimization for field PMs
+- Notion adoption is the biggest change management risk *(Options 2/3 only — Option 1 avoids this entirely with email-only approvals)*
+- Approval workflow is passive (PM must log into Notion) *(Options 2/3)*
+- No mobile optimization for field PMs *(Options 2/3)*
+- Option 1 provides the simplest PM experience (email only) but least visibility
 
 **Recommendations:**
-- Use n8n "Send and Wait" — PM replies "APPROVE" via email
-- Create mobile-optimized Notion view
-- Plan 2-hour PM training with recorded walkthrough
-- Start with 1-2 pilot PMs before full rollout
+- Use n8n "Send and Wait" — PM replies "APPROVE" via email *(all options)*
+- Create mobile-optimized Notion view *(Options 2/3)*
+- Plan 30-minute PM training with recorded walkthrough *(all options)*
+- Start with 1-2 pilot PMs before full rollout *(all options)*
+- Option 1 is the lowest change management risk — consider starting here if PM adoption is a concern
 
 ---
 
@@ -220,29 +237,27 @@ The system prevents payment errors, benefiting both Frontline and subcontractors
 
 ## Final Recommendation for the Frontline Holdings Team
 
-### Verdict: BUILD THIS SYSTEM — with modifications
+### Verdict: BUILD THIS SYSTEM
 
-This system addresses a **real, expensive problem** ($150K-720K/year in duplicate payments) with a cost-effective solution (~$150/month). The architecture is sound, the research is thorough, and the ROI is exceptional.
+This system addresses a **real, expensive problem** ($150K-720K/year in duplicate payments) with a cost-effective solution. The architecture is sound, the research is thorough, and the ROI is exceptional across all three engagement options.
 
-### Before Building — Resolve These 3 Items:
+### Resolved Items (Previously Flagged):
 
-1. **SmoothX Boundary** — Map exactly what SmoothX syncs. If SmoothX handles Procore→QBO bill creation, remove that from n8n. n8n should only CREATE customer invoices (not vendor bills) in QBO, and READ vendor bills for dedup verification.
+1. **SmoothX Boundary — RESOLVED.** The architecture now enforces that n8n NEVER writes vendor bills to QBO. SmoothX owns bill sync. n8n writes only customer invoices. This is documented as a hard constraint across all materials.
 
-2. **Error Handling** — Add Error Trigger workflows to all 3 n8n workflows before going live. Every API failure must be logged, alerted, and recoverable.
+2. **Error Handling** — Must be implemented during build. Add Error Trigger workflows to all n8n workflows before going live. Every API failure must be logged, alerted, and recoverable.
 
-3. **PM Pilot Program** — Don't roll out to all PMs at once. Start with 2 PMs, 1 project, for 2 weeks. Tune matching thresholds, then expand.
+3. **PM Pilot Program** — Built into the phased rollout. All options include a pilot deployment on one project before full rollout.
 
-### Implementation Priority Order:
+### Which Option to Choose:
 
-| Priority | What | Why |
-|----------|------|-----|
-| Week 1-2 | Notion databases + Dedup Engine only | Immediately prevents new duplicates |
-| Week 3-4 | Procore-QBO matching + PM notifications | Automates the matching bottleneck |
-| Week 5-6 | Customer invoicing + follow-up automation | Speeds up cash collection |
-| Week 7-8 | AI enhancement + threshold tuning | Improves accuracy over time |
-| Week 9-10 | Full rollout + training | Organizational adoption |
+| If your priority is... | Choose... | Why |
+|------------------------|-----------|-----|
+| Fastest, cheapest fix for duplicate payments | **Option 1 ($14,000)** | 8 weeks. Solves the core problem. No new platforms for PMs to learn. |
+| Duplicate fix + centralized visibility & dashboards | **Option 2 ($22,000) — Recommended** | 12 weeks. Best balance of value, visibility, and risk. |
+| Full independence from SmoothX | **Option 3 ($42,000)** | 20 weeks. Requires maintenance retainer. Higher risk first 6 months. |
 
-### Expected Impact:
+### Expected Impact (All Options):
 
 | Metric | Before | After |
 |--------|--------|-------|
@@ -250,10 +265,12 @@ This system addresses a **real, expensive problem** ($150K-720K/year in duplicat
 | Invoice processing time | 15 min/invoice | 2 min/invoice |
 | PM hours on invoice routing | 40 hrs/month | 8 hrs/month |
 | Customer follow-up consistency | Manual/sporadic | Automated/100% |
-| Financial visibility | 3 disconnected systems | Single Notion dashboard |
+| Financial visibility | 3 disconnected systems | Improved (Option 1) / Single dashboard (Options 2/3) |
 | Monthly cost of duplicates | $75,000-$225,000 | ~$0-$15,000 |
-| Monthly system cost | $0 | ~$150 |
+| Monthly system cost | $0 | $70-700 (depending on option) |
 
 ### Bottom Line
 
-For **$150/month**, Frontline can prevent **$75,000-$225,000/month** in payment errors. This is one of the highest-ROI automation investments available to a construction company. The system design is sound — resolve the SmoothX boundary question, add error handling, and start with a pilot before full deployment.
+Even Option 1 at **$14,000 one-time + $70-150/month** can prevent **$75,000-$225,000/month** in payment errors. This is one of the highest-ROI automation investments available to a construction company. The system design is sound, the SmoothX boundary is resolved, and the phased rollout minimizes risk.
+
+See `PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md` for full pricing, timelines, retainer options, and next steps.

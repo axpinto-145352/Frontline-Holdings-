@@ -38,7 +38,7 @@
 ### Option 2 — Gap-Filler + 2nd Brain ($22,000 / 12 weeks) — RECOMMENDED
 - Everything in Option 1 + full Notion workspace as 2nd source of truth
 - 6 databases, PM dashboards, one-click approvals, business-user audit trail
-- Monthly run-rate: ~$320-700/mo
+- Monthly run-rate: ~$120-200/mo (new costs) / ~$320-700/mo (incl. existing SmoothX)
 
 ### Option 3 — Full Replacement ($42,000 / 20 weeks)
 - Everything in Option 2 + complete SmoothX replacement

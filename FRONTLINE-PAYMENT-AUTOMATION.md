@@ -1028,26 +1028,27 @@ return [{
 - [ ] Configure email templates (invoice, reminders, escalation)
 - [ ] Test end-to-end flow: receive -> match -> invoice -> follow-up
 
-### Phase 5: Polish & Launch (Weeks 9-10)
+### Phase 5: Rollout & Optimization (Weeks 9-12)
 - [ ] Connect SmoothX sync layer data feed
-- [ ] Historical data migration into Notion
-- [ ] PM training on Notion dashboard
-- [ ] Parallel run: old process + new system
-- [ ] Full cutover to automated system
-- [ ] Monitor and tune for 30 days
+- [ ] Historical data migration into Notion *(Options 2/3 only)*
+- [ ] PM training on dashboards and approval workflows
+- [ ] Pilot deployment on one project (Weeks 9-10)
+- [ ] Expand to all active projects (Weeks 11-12)
+- [ ] Monitor and tune AI matching thresholds for 30 days
 
-### Estimated Monthly Costs
+### Estimated Monthly Costs (New Costs Only — Option 2)
 
 | Service | Cost | Notes |
 |---------|------|-------|
-| n8n Cloud (Pro) | $50/mo | Or self-hosted for $0 |
-| Notion Team | $10/user/mo | ~5 users = $50/mo |
-| Claude API | ~$30-50/mo | For AI matching (~500 invoices) |
+| n8n Cloud (Pro) | ~$50-100/mo | Or self-hosted for $0 |
+| Notion Team | ~$50/mo | ~5 users at $10/user/mo *(Options 2/3 only)* |
+| Claude API | ~$20-50/mo | For AI matching (~500 invoices) |
 | Procore | Existing | Already licensed |
 | QBO | Existing | Already licensed |
-| **Total** | **~$130-150/mo** | vs. $150,000+/mo in duplicate payments |
+| SmoothX | Existing (~$200-500/mo) | Already in budget *(Options 1/2 — eliminated in Option 3)* |
+| **New costs total** | **~$120-200/mo** | Does not include existing SmoothX subscription |
 
-**ROI: System pays for itself within the first prevented duplicate payment.**
+**ROI: Even catching one duplicate payment ($15,000) pays for the entire system for years. See proposal for full ROI analysis.**
 
 ---
 

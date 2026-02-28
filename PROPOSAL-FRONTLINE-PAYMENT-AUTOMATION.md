@@ -298,57 +298,34 @@ Week 9-12   ░░░░░░░░██████████████�
 
 ---
 
-## 9. Terms & Conditions
+## 9. Engagement Terms (Summary)
 
-1. **Scope:** This proposal covers the scope defined in Section 3. Changes to scope require a written change order with agreed pricing before work begins.
+The following terms are provided for reference and will be formalized in the Statement of Work (SOW):
 
-2. **Payment terms:** Net 15 from invoice date. Milestone invoices issued upon completion of each milestone as defined in Section 5.
+- **Scope management:** Changes to scope will be handled through written change orders with agreed pricing before work begins.
+- **Payment terms:** Net 15 from invoice date, with milestone-based billing as outlined in Section 5.
+- **Intellectual property:** All deliverables become Frontline Holdings' property upon final payment. Veteran Vectors retains the right to reuse general knowledge and methodologies (but not Frontline-specific data or configurations).
+- **Confidentiality:** All Frontline data, credentials, and business processes will be treated as confidential. No data will be shared with third parties, used for AI training, or retained after engagement completion.
+- **Warranty:** 90-day warranty on all delivered workflows. Defects fixed at no charge. Does not cover third-party API changes or Frontline configuration changes.
+- **Third-party services:** Frontline Holdings maintains its own subscriptions (Procore, QBO, Notion, n8n, SmoothX, Claude API). Veteran Vectors is not responsible for third-party outages or pricing changes.
+- **Retainer:** Optional, begins after Phase 5. Either party may adjust or cancel with 30 days' notice. Overage billed at $125/hour.
 
-3. **Intellectual property:** All deliverables (workflows, configurations, documentation, templates) become Frontline Holdings' property upon final payment. Veteran Vectors retains the right to use general knowledge, techniques, and methodologies (but not Frontline-specific data or configurations) in other engagements.
-
-4. **Confidentiality:** Veteran Vectors will treat all Frontline Holdings data, credentials, financial information, and business processes as confidential. No Frontline data will be shared with third parties, used for training AI models, or retained after engagement completion.
-
-5. **Warranties:** Veteran Vectors warrants that all delivered workflows will function as specified for 90 days following Phase 5 completion. Defects (bugs, broken integrations, incorrect logic) discovered during the warranty period will be fixed at no additional charge. This warranty does not cover issues caused by third-party API changes (Procore, QBO, Notion), changes to Frontline's system configuration, or force majeure.
-
-6. **Limitation of liability:** Veteran Vectors' total liability under this agreement shall not exceed the total fees paid. Veteran Vectors is not liable for financial losses resulting from duplicate payments that occur before the system is operational, or from invoices processed outside the automated system.
-
-7. **Third-party services:** Frontline Holdings is responsible for maintaining active subscriptions to Procore, QuickBooks Online, Notion, n8n Cloud, SmoothX, and Claude API. Veteran Vectors is not responsible for outages, API changes, or pricing changes by these providers.
-
-8. **Termination:** Either party may terminate this agreement with 14 days' written notice. In the event of early termination, Frontline Holdings pays for all completed milestones plus a prorated amount for work in progress. All completed deliverables transfer to Frontline Holdings regardless of termination.
-
-9. **Data access:** Frontline Holdings will provide Veteran Vectors with necessary API credentials, Procore admin access (for Developer App registration), and Notion workspace access for the duration of the engagement. All credentials will be stored securely and revoked upon project completion (or transferred to Frontline's credential store).
-
-10. **Retainer terms:** The monthly retainer (Section 5) is optional and begins the month following Phase 5 completion. Either party may adjust tier or cancel with 30 days' written notice. Hours beyond the monthly allocation are billed at $125/hour.
+*Full terms, conditions, and liability provisions will be detailed in the formal SOW.*
 
 ---
 
-## 10. Acceptance
+## 10. Next Steps
 
-To proceed, please sign below and return this proposal along with the first milestone payment ($5,500). Veteran Vectors will schedule a kickoff meeting within 5 business days of receipt.
+This proposal is provided for awareness and understanding. A separate Statement of Work (SOW) will be prepared for formal execution upon alignment.
 
-&nbsp;
+**To move forward:**
 
-**For Frontline Holdings LLC:**
+1. Review this proposal and the accompanying Integration Roadmap Report
+2. Identify an executive sponsor for the initiative
+3. Schedule a walkthrough call with Veteran Vectors to discuss questions and preferences
+4. Upon alignment, Veteran Vectors will deliver a formal SOW for signature
 
-Signature: ___________________________________
-
-Printed Name: ___________________________________
-
-Title: ___________________________________
-
-Date: ___________________________________
-
-&nbsp;
-
-**For Veteran Vectors:**
-
-Signature: ___________________________________
-
-Printed Name: ___________________________________
-
-Title: ___________________________________
-
-Date: ___________________________________
+**Contact:** Please reach out to Veteran Vectors to schedule a discussion or request any clarification on the contents of this proposal.
 
 ---
 

@@ -1,0 +1,275 @@
+{
+  "name": "Frontline - Customer Invoice & Follow-Up",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Hourly Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "notes": "Runs every hour to check for approved invoices and overdue follow-ups"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": "={{ $env.NOTION_INVOICE_TRACKER_DB_ID }}",
+        "filterType": "string",
+        "filters": {
+          "filter": {
+            "property": "Status",
+            "select": {
+              "equals": "Approved"
+            }
+          }
+        }
+      },
+      "id": "get-approved-invoices",
+      "name": "Get Approved Invoices",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [480, 200],
+      "notes": "Query Notion for invoices with status = Approved"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": "={{ $env.NOTION_INVOICE_TRACKER_DB_ID }}",
+        "filterType": "string",
+        "filters": {
+          "filter": {
+            "and": [
+              {
+                "property": "Status",
+                "select": {
+                  "equals": "Invoiced to Customer"
+                }
+              },
+              {
+                "property": "Payment Due",
+                "date": {
+                  "before": "={{ new Date().toISOString().split('T')[0] }}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "id": "get-overdue-invoices",
+      "name": "Get Overdue Invoices",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [480, 450],
+      "notes": "Query Notion for overdue invoices (past Payment Due date)"
+    },
+    {
+      "parameters": {
+        "resource": "invoice",
+        "operation": "create",
+        "additionalFields": {
+          "customerRef": "={{ $json.qbo_customer_id }}",
+          "docNumber": "={{ $json.invoice_number }}",
+          "txnDate": "={{ new Date().toISOString().split('T')[0] }}",
+          "line": [
+            {
+              "amount": "={{ $json.amount }}",
+              "detailType": "SalesItemLineDetail",
+              "description": "=Project: {{ $json.project_name }} - {{ $json.description }}"
+            }
+          ],
+          "billEmail": "={{ $json.customer_email }}",
+          "dueDate": "={{ $json.payment_due_date }}"
+        }
+      },
+      "id": "create-customer-invoice",
+      "name": "Create Customer Invoice in QBO",
+      "type": "n8n-nodes-base.quickbooks",
+      "typeVersion": 1,
+      "position": [710, 200],
+      "notes": "Generate customer invoice in QuickBooks Online"
+    },
+    {
+      "parameters": {
+        "resource": "invoice",
+        "operation": "send",
+        "invoiceId": "={{ $json.Id }}"
+      },
+      "id": "send-customer-invoice",
+      "name": "Send Invoice to Customer",
+      "type": "n8n-nodes-base.quickbooks",
+      "typeVersion": 1,
+      "position": [940, 200],
+      "notes": "Email invoice to customer via QBO native email"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": "={{ $json.notion_page_id }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Status", "selectValue": "Invoiced to Customer" },
+            { "key": "Invoiced Date", "dateValue": "={{ new Date().toISOString().split('T')[0] }}" },
+            { "key": "QBO Invoice ID", "richTextValue": "={{ $node['Create Customer Invoice in QBO'].json.Id }}" }
+          ]
+        }
+      },
+      "id": "update-notion-invoiced",
+      "name": "Update Notion Status",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [1170, 200],
+      "notes": "Update Notion entry to Invoiced to Customer"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.pm_email }}",
+        "subject": "=Invoice #{{ $json.invoice_number }} Sent to {{ $json.customer_name }} for ${{ $json.amount }}",
+        "emailType": "html",
+        "message": "=<h2>Customer Invoice Sent</h2>\n<p>Invoice #{{ $json.invoice_number }} has been sent to <strong>{{ $json.customer_name }}</strong>.</p>\n<table border='1' cellpadding='8'>\n<tr><td><strong>Amount</strong></td><td>${{ $json.amount }}</td></tr>\n<tr><td><strong>Project</strong></td><td>{{ $json.project_name }}</td></tr>\n<tr><td><strong>Due Date</strong></td><td>{{ $json.payment_due_date }}</td></tr>\n<tr><td><strong>QBO Invoice ID</strong></td><td>{{ $node['Create Customer Invoice in QBO'].json.Id }}</td></tr>\n</table>\n<p>Track status: <a href='{{ $json.notion_link }}'>Notion Dashboard</a></p>\n<p>— Frontline Payment Automation System</p>"
+      },
+      "id": "email-pm-confirmation",
+      "name": "Confirm to PM",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1400, 200],
+      "notes": "Email PM confirmation that customer invoice was sent"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Categorize overdue invoices by days overdue\nconst items = $input.all();\nconst results = items.map(item => {\n  const dueDate = new Date(item.json.payment_due_date);\n  const today = new Date();\n  const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));\n  \n  let escalation = 'gentle';\n  if (daysOverdue > 30) escalation = 'escalation';\n  else if (daysOverdue > 15) escalation = 'firm';\n  \n  return {\n    json: {\n      ...item.json,\n      days_overdue: daysOverdue,\n      escalation_level: escalation\n    }\n  };\n});\n\nreturn results;"
+      },
+      "id": "categorize-overdue",
+      "name": "Categorize by Days Overdue",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [710, 450],
+      "notes": "Classify overdue invoices: gentle (1-15 days), firm (16-30), escalation (31+)"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "output": 0,
+              "conditions": {
+                "string": [{ "value1": "={{ $json.escalation_level }}", "value2": "gentle" }]
+              }
+            },
+            {
+              "output": 1,
+              "conditions": {
+                "string": [{ "value1": "={{ $json.escalation_level }}", "value2": "firm" }]
+              }
+            }
+          ],
+          "fallbackOutput": 2
+        }
+      },
+      "id": "escalation-router",
+      "name": "Escalation Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [940, 450],
+      "notes": "Route to appropriate follow-up template"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.customer_email }}",
+        "subject": "=Friendly Reminder - Invoice #{{ $json.invoice_number }} Due {{ $json.payment_due_date }}",
+        "emailType": "html",
+        "message": "=<p>Dear {{ $json.customer_name }},</p>\n<p>This is a friendly reminder that Invoice #{{ $json.invoice_number }} for <strong>${{ $json.amount }}</strong> was due on {{ $json.payment_due_date }}.</p>\n<p>If payment has already been sent, please disregard this message.</p>\n<p>Questions? Contact {{ $json.pm_name }} at {{ $json.pm_email }}.</p>\n<p>Thank you,<br>Frontline Holdings</p>"
+      },
+      "id": "gentle-reminder",
+      "name": "Gentle Reminder",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1170, 350],
+      "notes": "1-15 days overdue: gentle reminder to customer"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.customer_email }}",
+        "cc": "={{ $json.pm_email }}",
+        "subject": "=Payment Overdue - Invoice #{{ $json.invoice_number }} ({{ $json.days_overdue }} days)",
+        "emailType": "html",
+        "message": "=<p>Dear {{ $json.customer_name }},</p>\n<p>Invoice #{{ $json.invoice_number }} for <strong>${{ $json.amount }}</strong> is now <strong>{{ $json.days_overdue }} days past due</strong>.</p>\n<p>Please arrange payment at your earliest convenience. If there are questions regarding this invoice, please contact {{ $json.pm_name }} at {{ $json.pm_email }}.</p>\n<p>Thank you,<br>Frontline Holdings</p>"
+      },
+      "id": "firm-reminder",
+      "name": "Firm Reminder",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1170, 450],
+      "notes": "16-30 days overdue: firm reminder, CC PM"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.pm_email }},{{ $env.FINANCE_TEAM_EMAIL }}",
+        "subject": "=🔴 ESCALATION: Invoice #{{ $json.invoice_number }} - {{ $json.days_overdue }} Days Overdue (${{ $json.amount }})",
+        "emailType": "html",
+        "message": "=<h2>Payment Escalation Alert</h2>\n<p>The following invoice is <strong>{{ $json.days_overdue }} days overdue</strong> and requires immediate attention:</p>\n<table border='1' cellpadding='8'>\n<tr><td><strong>Customer</strong></td><td>{{ $json.customer_name }}</td></tr>\n<tr><td><strong>Invoice #</strong></td><td>{{ $json.invoice_number }}</td></tr>\n<tr><td><strong>Amount</strong></td><td>${{ $json.amount }}</td></tr>\n<tr><td><strong>Project</strong></td><td>{{ $json.project_name }}</td></tr>\n<tr><td><strong>Due Date</strong></td><td>{{ $json.payment_due_date }}</td></tr>\n<tr><td><strong>Days Overdue</strong></td><td>{{ $json.days_overdue }}</td></tr>\n<tr><td><strong>Follow-ups Sent</strong></td><td>{{ $json.followup_count }}</td></tr>\n</table>\n<p><strong>Action Required:</strong> Please escalate with the customer directly.</p>\n<p>— Frontline Payment Automation System</p>"
+      },
+      "id": "escalation-alert",
+      "name": "Escalation Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1170, 550],
+      "notes": "31+ days overdue: escalation to PM + finance team"
+    }
+  ],
+  "connections": {
+    "Hourly Check": {
+      "main": [
+        [
+          { "node": "Get Approved Invoices", "type": "main", "index": 0 },
+          { "node": "Get Overdue Invoices", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Approved Invoices": {
+      "main": [[{ "node": "Create Customer Invoice in QBO", "type": "main", "index": 0 }]]
+    },
+    "Create Customer Invoice in QBO": {
+      "main": [[{ "node": "Send Invoice to Customer", "type": "main", "index": 0 }]]
+    },
+    "Send Invoice to Customer": {
+      "main": [[{ "node": "Update Notion Status", "type": "main", "index": 0 }]]
+    },
+    "Update Notion Status": {
+      "main": [[{ "node": "Confirm to PM", "type": "main", "index": 0 }]]
+    },
+    "Get Overdue Invoices": {
+      "main": [[{ "node": "Categorize by Days Overdue", "type": "main", "index": 0 }]]
+    },
+    "Categorize by Days Overdue": {
+      "main": [[{ "node": "Escalation Router", "type": "main", "index": 0 }]]
+    },
+    "Escalation Router": {
+      "main": [
+        [{ "node": "Gentle Reminder", "type": "main", "index": 0 }],
+        [{ "node": "Firm Reminder", "type": "main", "index": 0 }],
+        [{ "node": "Escalation Alert", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "frontline-holdings" },
+    { "name": "payment-automation" },
+    { "name": "customer-invoicing" },
+    { "name": "follow-up" }
+  ]
+}

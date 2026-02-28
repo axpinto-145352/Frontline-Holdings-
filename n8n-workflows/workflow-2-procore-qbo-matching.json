@@ -1,0 +1,185 @@
+{
+  "name": "Frontline - Procore-QBO Matching Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "invoice-matching",
+        "responseMode": "onReceived"
+      },
+      "id": "matching-trigger",
+      "name": "Receive Clean Invoice",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "notes": "Receives non-duplicate invoices from Workflow 1"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.procore.com/rest/v1.0/commitment_contracts",
+        "authentication": "oAuth2",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "project_id",
+              "value": "={{ $json.procore_project_id }}"
+            }
+          ]
+        }
+      },
+      "id": "get-procore-commitments",
+      "name": "Get Procore Commitments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [480, 300],
+      "notes": "GET commitments for the project from Procore API"
+    },
+    {
+      "parameters": {
+        "jsCode": "// AI-Powered Commitment Matching Logic\nconst invoice = $input.first().json;\nconst commitments = $node['Get Procore Commitments'].json;\n\n// Fuzzy vendor name matching\nfunction similarity(s1, s2) {\n  const longer = s1.length > s2.length ? s1 : s2;\n  const shorter = s1.length > s2.length ? s2 : s1;\n  if (longer.length === 0) return 1.0;\n  const costs = [];\n  for (let i = 0; i <= shorter.length; i++) {\n    let lastValue = i;\n    for (let j = 0; j <= longer.length; j++) {\n      if (i === 0) { costs[j] = j; }\n      else if (j > 0) {\n        let newValue = costs[j - 1];\n        if (shorter.charAt(i - 1) !== longer.charAt(j - 1)) {\n          newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;\n        }\n        costs[j - 1] = lastValue;\n        lastValue = newValue;\n      }\n    }\n    if (i > 0) costs[longer.length] = lastValue;\n  }\n  return (longer.length - costs[longer.length]) / longer.length;\n}\n\nlet bestMatch = null;\nlet bestScore = 0;\n\nfor (const commitment of commitments) {\n  const vendorSim = similarity(\n    invoice.normalized_vendor,\n    (commitment.vendor_name || '').toLowerCase().replace(/[^a-z0-9]/g, '')\n  );\n  \n  const remaining = commitment.grand_total - (commitment.invoiced_amount || 0);\n  const amountFits = invoice.amount <= remaining * 1.05; // 5% tolerance\n  \n  const score = vendorSim * (amountFits ? 1 : 0.5);\n  \n  if (score > bestScore) {\n    bestScore = score;\n    bestMatch = {\n      commitment_id: commitment.id,\n      commitment_number: commitment.number,\n      vendor_name: commitment.vendor_name,\n      committed_amount: commitment.grand_total,\n      billed_to_date: commitment.invoiced_amount || 0,\n      remaining: remaining,\n      vendor_similarity: (vendorSim * 100).toFixed(1),\n      amount_fits: amountFits,\n      match_score: (score * 100).toFixed(1)\n    };\n  }\n}\n\nlet confidence = 'LOW';\nif (bestScore > 0.9) confidence = 'HIGH';\nelse if (bestScore > 0.6) confidence = 'MEDIUM';\n\nreturn [{\n  json: {\n    ...invoice,\n    match: bestMatch,\n    match_confidence: confidence,\n    match_score: bestMatch ? bestMatch.match_score : 0\n  }\n}];"
+      },
+      "id": "match-to-commitment",
+      "name": "Match to Commitment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [710, 300],
+      "notes": "Fuzzy match invoice to Procore commitment by vendor name + amount"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "output": 0,
+              "conditions": {
+                "string": [
+                  {
+                    "value1": "={{ $json.match_confidence }}",
+                    "value2": "HIGH"
+                  }
+                ]
+              }
+            },
+            {
+              "output": 1,
+              "conditions": {
+                "string": [
+                  {
+                    "value1": "={{ $json.match_confidence }}",
+                    "value2": "MEDIUM"
+                  }
+                ]
+              }
+            }
+          ],
+          "fallbackOutput": 2
+        }
+      },
+      "id": "confidence-router",
+      "name": "Match Confidence Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [940, 300],
+      "notes": "Route by confidence: HIGH=auto-match, MEDIUM=flag for review, LOW=manual"
+    },
+    {
+      "parameters": {
+        "resource": "bill",
+        "operation": "create",
+        "additionalFields": {
+          "vendorRef": "={{ $json.qbo_vendor_id }}",
+          "docNumber": "={{ $json.invoice_number }}",
+          "txnDate": "={{ $json.invoice_date }}",
+          "line": [
+            {
+              "amount": "={{ $json.amount }}",
+              "detailType": "AccountBasedExpenseLineDetail",
+              "accountRef": "={{ $json.expense_account_id }}"
+            }
+          ],
+          "privateNote": "=Procore Commitment: {{ $json.match.commitment_number }} | Auto-matched ({{ $json.match_confidence }})"
+        }
+      },
+      "id": "create-qbo-bill",
+      "name": "Create Bill in QBO",
+      "type": "n8n-nodes-base.quickbooks",
+      "typeVersion": 1,
+      "position": [1170, 200],
+      "notes": "Create vendor bill in QuickBooks Online"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": "={{ $env.NOTION_INVOICE_TRACKER_DB_ID }}",
+        "title": "={{ $json.invoice_number }}",
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Fingerprint", "richTextValue": "={{ $json.fingerprint }}" },
+            { "key": "Vendor", "selectValue": "={{ $json.vendor_name }}" },
+            { "key": "Amount", "numberValue": "={{ $json.amount }}" },
+            { "key": "Invoice Date", "dateValue": "={{ $json.invoice_date }}" },
+            { "key": "Procore Commitment", "richTextValue": "={{ $json.match.commitment_number }}" },
+            { "key": "QBO Bill ID", "richTextValue": "={{ $node['Create Bill in QBO'].json.Id }}" },
+            { "key": "Status", "selectValue": "Matched - Pending Approval" },
+            { "key": "Match Confidence", "selectValue": "={{ $json.match_confidence }}" },
+            { "key": "Entry Source", "selectValue": "={{ $json.source || 'Procore' }}" }
+          ]
+        }
+      },
+      "id": "notion-log-matched",
+      "name": "Log in Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [1400, 200],
+      "notes": "Create Notion entry with match details"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.pm_email }}",
+        "subject": "=Invoice Ready for Review - {{ $json.vendor_name }} ${{ $json.amount }} - {{ $json.project_name }}",
+        "emailType": "html",
+        "message": "=<h2>Invoice Matched to Procore Commitment</h2>\n<table border='1' cellpadding='8'>\n<tr><td><strong>Vendor</strong></td><td>{{ $json.vendor_name }}</td></tr>\n<tr><td><strong>Invoice #</strong></td><td>{{ $json.invoice_number }}</td></tr>\n<tr><td><strong>Amount</strong></td><td>${{ $json.amount }}</td></tr>\n<tr><td><strong>Project</strong></td><td>{{ $json.project_name }}</td></tr>\n</table>\n<h3>Procore Match</h3>\n<table border='1' cellpadding='8'>\n<tr><td><strong>Commitment</strong></td><td>#{{ $json.match.commitment_number }}</td></tr>\n<tr><td><strong>Committed Amount</strong></td><td>${{ $json.match.committed_amount }}</td></tr>\n<tr><td><strong>Previously Billed</strong></td><td>${{ $json.match.billed_to_date }}</td></tr>\n<tr><td><strong>This Invoice</strong></td><td>${{ $json.amount }}</td></tr>\n<tr><td><strong>Remaining After</strong></td><td>${{ $json.match.remaining - $json.amount }}</td></tr>\n<tr><td><strong>Match Confidence</strong></td><td>{{ $json.match_confidence }} ({{ $json.match_score }}%)</td></tr>\n</table>\n<p><a href='{{ $json.notion_link }}'>APPROVE or REJECT in Notion Dashboard</a></p>\n<p>— Frontline Payment Automation System</p>"
+      },
+      "id": "email-pm-approval",
+      "name": "Email PM for Approval",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1630, 200],
+      "notes": "Send PM invoice details with Procore match for approval"
+    }
+  ],
+  "connections": {
+    "Receive Clean Invoice": {
+      "main": [[{ "node": "Get Procore Commitments", "type": "main", "index": 0 }]]
+    },
+    "Get Procore Commitments": {
+      "main": [[{ "node": "Match to Commitment", "type": "main", "index": 0 }]]
+    },
+    "Match to Commitment": {
+      "main": [[{ "node": "Match Confidence Router", "type": "main", "index": 0 }]]
+    },
+    "Match Confidence Router": {
+      "main": [
+        [{ "node": "Create Bill in QBO", "type": "main", "index": 0 }],
+        [{ "node": "Create Bill in QBO", "type": "main", "index": 0 }],
+        [{ "node": "Email PM for Approval", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Bill in QBO": {
+      "main": [[{ "node": "Log in Notion", "type": "main", "index": 0 }]]
+    },
+    "Log in Notion": {
+      "main": [[{ "node": "Email PM for Approval", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "frontline-holdings" },
+    { "name": "payment-automation" },
+    { "name": "matching-engine" }
+  ]
+}

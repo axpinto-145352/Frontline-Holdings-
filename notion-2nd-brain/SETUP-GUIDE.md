@@ -1,11 +1,15 @@
 # Notion 2nd Brain Setup Guide for Frontline Holdings
-## Source of Truth — Invoice, Payment & Project Tracking
+## 2nd Source of Truth — Invoice, Payment & Project Tracking
+
+> **Applies to:** Proposal Option 2 (Gap-Filler + 2nd Brain) and Option 3 (Full Replacement) only.
+> Option 1 (Gap-Filler) does not include Notion — skip this guide if Option 1 is selected.
+> See `PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md` for option details and pricing.
 
 ---
 
 ## Overview
 
-This guide walks through setting up Notion as Frontline Holdings' **"2nd Brain"** — a single source of truth that aggregates data from Procore, QuickBooks Online, and SmoothX into one unified operational dashboard.
+This guide walks through setting up Notion as Frontline Holdings' **"2nd Brain"** — a second source of truth that aggregates data from Procore, QuickBooks Online, and SmoothX into one unified operational dashboard. Procore and QBO remain the systems of record for financial transactions; Notion provides centralized visibility, dashboards, and an audit trail.
 
 The architecture follows the **PARA Method** (Projects, Areas, Resources, Archives) from Tiago Forte's "Building a Second Brain" methodology, adapted for construction company operations.
 
@@ -244,4 +248,4 @@ Procore Project ID  <--> Notion Project (stored in "Procore Project ID" property
          Procore Commitment      QBO Bill / Invoice Record
 ```
 
-This ensures **every Notion record contains the foreign keys for both Procore and QBO**, enabling full cross-system traceability and reconciliation.
+This ensures **every Notion record contains the foreign keys for both Procore and QBO**, enabling full cross-system traceability and reconciliation. Procore and QBO remain the authoritative systems of record — Notion serves as the 2nd Brain for visibility and operational dashboards.

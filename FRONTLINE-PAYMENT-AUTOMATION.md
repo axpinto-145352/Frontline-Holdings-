@@ -2,9 +2,15 @@
 ## AI-Powered Invoice Matching & Duplicate Payment Prevention
 
 **Date:** 2026-02-28
-**Version:** 1.0
+**Version:** 2.0
 **Prepared for:** Frontline Holdings Team
+**Prepared by:** Veteran Vectors
 **System:** QBO <> Procore <> Notion (2nd Brain) <> n8n Orchestration
+
+> **Engagement options:** This technical architecture document supports all three engagement options presented in the client proposal (`PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md`):
+> - **Option 1 — Gap-Filler ($14,000):** Sections 1-6, 8-9 apply. Section 7 (Notion) does not apply.
+> - **Option 2 — Gap-Filler + 2nd Brain ($22,000):** All sections apply.
+> - **Option 3 — Full Replacement ($42,000):** All sections apply, plus additional SmoothX replacement workflows (detailed in the proposal, Phases 5-6).
 
 ---
 
@@ -25,14 +31,22 @@
 
 ## 1. Executive Summary
 
-Frontline Holdings, a construction/general contracting company, is experiencing **critical financial losses from duplicate and triple payments** due to disconnected systems between their project management (Procore), accounting (QuickBooks Online), and integration middleware (SmoothX). This document outlines a complete automation system using **n8n workflow automation** as the orchestration layer, **Notion as a 2nd Brain/source of truth**, and **AI-powered matching logic** to eliminate duplicate payments and streamline the invoice-to-payment lifecycle.
+Frontline Holdings, a construction/general contracting company, is experiencing **critical financial losses from duplicate and triple payments** due to disconnected systems between their project management (Procore), accounting (QuickBooks Online), and integration middleware (SmoothX). This document outlines a complete automation system using **n8n workflow automation** as the orchestration layer, **Notion as a 2nd Brain/source of truth** (Options 2 & 3), and **AI-powered matching logic** to eliminate duplicate payments and streamline the invoice-to-payment lifecycle.
 
-### Key Outcomes
-- **Eliminate 100% of duplicate/triple payments** through automated deduplication
-- **Reduce invoice processing time by 70%** through automated matching
-- **Single source of truth** in Notion for all payment status tracking
+### Key Outcomes (All Options)
+- **Eliminate 100% of duplicate/triple payments** through automated 5-layer deduplication
+- **Reduce invoice processing time by 70%** through AI-powered matching
 - **Automated PM notifications** with follow-up email sequences
-- **Full audit trail** from invoice receipt to customer payment
+- **Customer invoice automation** with 3-tier escalation for overdue invoices
+
+### Additional Outcomes (Options 2 & 3)
+- **Centralized 2nd source of truth** in Notion for all payment status tracking
+- **Real-time dashboards** for PMs, Finance, and Leadership
+- **Full audit trail database** from invoice receipt to customer payment
+
+### Additional Outcomes (Option 3 Only)
+- **SmoothX eliminated** — complete Procore↔QBO sync handled by n8n
+- **No vendor dependency** — full control over every data flow
 
 ---
 
@@ -316,6 +330,8 @@ SELECT * FROM Bill WHERE VendorRef = '{vendor_id}'
 
 ## 5. System Architecture
 
+> **Applies to:** All options. The architecture below shows the full system (Option 2). For Option 1, remove Notion — dedup data is stored in n8n's internal datastore and QBO custom fields, and PM approvals are email-only. For Option 3, SmoothX is removed and its sync responsibilities are absorbed by additional n8n workflows.
+
 ### High-Level Architecture
 
 ```
@@ -350,7 +366,7 @@ SELECT * FROM Bill WHERE VendorRef = '{vendor_id}'
 |                  |     |                  |     |                  |
 |   NOTION         |     |     EMAIL        |     |   AI ENGINE     |
 |   (2nd Brain)    |     | (Gmail/SMTP)     |     |  (Claude API)   |
-|   Source of Truth |     |                  |     |                  |
+|   2nd Brain       |     |                  |     |                  |
 +------------------+     +------------------+     +------------------+
 ```
 
@@ -385,12 +401,12 @@ Step 4: MATCH TO PROCORE COMMITMENT
     - Amount within commitment remaining
     - Cost code alignment
        |
-Step 5: CREATE/UPDATE IN QBO
-  Create Bill in QBO linked to vendor
-  Attach Procore commitment reference
-  Set approval status = "Pending PM Review"
+Step 5: VERIFY IN QBO (READ-ONLY)
+  Query QBO for existing bill (SmoothX creates vendor bills — n8n does NOT)
+  Cross-reference Procore commitment with QBO bill record
+  Confirm bill exists and amounts match
        |
-Step 6: LOG IN NOTION (Source of Truth)
+Step 6: LOG IN NOTION (2nd Brain)
   Create entry in Invoice Tracker database:
     - Invoice #, Vendor, Amount, Project
     - Procore Commitment Ref
@@ -598,9 +614,11 @@ TRIGGER: n8n Cron - runs daily
 
 ## 7. Notion 2nd Brain Setup
 
+> **Applies to:** Options 2 and 3 only. Option 1 (Gap-Filler) does not include Notion. If Option 1 is selected, skip this section — dedup data is stored in n8n's internal datastore and QBO custom fields, PM approvals are email-based, and reporting uses Procore + QBO native tools.
+
 ### Database Architecture
 
-The Notion workspace serves as the **single source of truth** — the "2nd Brain" that every system writes to and reads from.
+The Notion workspace serves as the **2nd source of truth** — the "2nd Brain" that aggregates data from Procore and QBO into a unified operational dashboard. Procore and QBO remain the systems of record for financial transactions; Notion provides centralized visibility, dashboards, and an audit trail.
 
 ### Database 1: Invoice Tracker (Master)
 
@@ -840,21 +858,14 @@ GET https://quickbooks.api.intuit.com/v3/company/{realmId}/query
          AND TxnDate>='{start_date}'
 Headers: { Authorization: "Bearer {token}" }
 
-// 2. Create vendor bill
-POST https://quickbooks.api.intuit.com/v3/company/{realmId}/bill
-Body: {
-  "VendorRef": { "value": "{vendor_id}" },
-  "Line": [{
-    "Amount": {amount},
-    "DetailType": "AccountBasedExpenseLineDetail",
-    "AccountBasedExpenseLineDetail": {
-      "AccountRef": { "value": "{expense_account_id}" }
-    }
-  }],
-  "TxnDate": "{invoice_date}",
-  "DocNumber": "{invoice_number}",
-  "PrivateNote": "Procore Commitment: {commitment_id}"
-}
+// 2. Query existing vendor bill (READ-ONLY — SmoothX creates bills, n8n does NOT)
+// n8n uses this to cross-reference and verify bills created by SmoothX
+GET https://quickbooks.api.intuit.com/v3/company/{realmId}/query
+  ?query=SELECT * FROM Bill WHERE DocNumber='{invoice_number}'
+         AND VendorRef='{vendor_id}'
+Headers: { Authorization: "Bearer {token}" }
+// NOTE: For Option 3 (Full Replacement), n8n replaces SmoothX and DOES create
+// vendor bills. The POST /bill endpoint is used only in Option 3.
 
 // 3. Create customer invoice
 POST https://quickbooks.api.intuit.com/v3/company/{realmId}/invoice
@@ -986,11 +997,13 @@ return [{
 
 ## 10. Implementation Roadmap
 
+> **Note:** This roadmap covers the full Option 2 build (12 weeks). For Option 1, Notion-related tasks are excluded (8 weeks total). For Option 3, Phases 5-6 are added for SmoothX replacement (20 weeks total). See the proposal (`PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md`) for detailed per-option scope and pricing.
+
 ### Phase 1: Foundation (Weeks 1-2)
-- [ ] Set up Notion workspace with all 6 databases
-- [ ] Configure Notion views (PM Dashboard, Duplicate Board, etc.)
+- [ ] Set up Notion workspace with all 6 databases *(Options 2/3 only)*
+- [ ] Configure Notion views (PM Dashboard, Duplicate Board, etc.) *(Options 2/3 only)*
 - [ ] Set up n8n instance (cloud or self-hosted)
-- [ ] Configure OAuth connections: Procore, QBO, Notion
+- [ ] Configure OAuth connections: Procore, QBO, Notion *(Notion: Options 2/3 only)*
 - [ ] Test API connectivity for all systems
 - [ ] Import existing vendor list and normalize names
 
@@ -1015,26 +1028,27 @@ return [{
 - [ ] Configure email templates (invoice, reminders, escalation)
 - [ ] Test end-to-end flow: receive -> match -> invoice -> follow-up
 
-### Phase 5: Polish & Launch (Weeks 9-10)
+### Phase 5: Rollout & Optimization (Weeks 9-12)
 - [ ] Connect SmoothX sync layer data feed
-- [ ] Historical data migration into Notion
-- [ ] PM training on Notion dashboard
-- [ ] Parallel run: old process + new system
-- [ ] Full cutover to automated system
-- [ ] Monitor and tune for 30 days
+- [ ] Historical data migration into Notion *(Options 2/3 only)*
+- [ ] PM training on dashboards and approval workflows
+- [ ] Pilot deployment on one project (Weeks 9-10)
+- [ ] Expand to all active projects (Weeks 11-12)
+- [ ] Monitor and tune AI matching thresholds for 30 days
 
-### Estimated Monthly Costs
+### Estimated Monthly Costs (New Costs Only — Option 2)
 
 | Service | Cost | Notes |
 |---------|------|-------|
-| n8n Cloud (Pro) | $50/mo | Or self-hosted for $0 |
-| Notion Team | $10/user/mo | ~5 users = $50/mo |
-| Claude API | ~$30-50/mo | For AI matching (~500 invoices) |
+| n8n Cloud (Pro) | ~$50-100/mo | Or self-hosted for $0 |
+| Notion Team | ~$50/mo | ~5 users at $10/user/mo *(Options 2/3 only)* |
+| Claude API | ~$20-50/mo | For AI matching (~500 invoices) |
 | Procore | Existing | Already licensed |
 | QBO | Existing | Already licensed |
-| **Total** | **~$130-150/mo** | vs. $150,000+/mo in duplicate payments |
+| SmoothX | Existing (~$200-500/mo) | Already in budget *(Options 1/2 — eliminated in Option 3)* |
+| **New costs total** | **~$120-200/mo** | Does not include existing SmoothX subscription |
 
-**ROI: System pays for itself within the first prevented duplicate payment.**
+**ROI: Even catching one duplicate payment ($15,000) pays for the entire system for years. See proposal for full ROI analysis.**
 
 ---
 

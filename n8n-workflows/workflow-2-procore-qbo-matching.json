@@ -17,14 +17,14 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.procore.com/rest/v1.0/commitment_contracts",
+        "url": "=https://api.procore.com/rest/v1.1/projects/{{ $json.procore_project_id }}/commitments",
         "authentication": "oAuth2",
-        "sendQuery": true,
-        "queryParameters": {
+        "sendHeaders": true,
+        "headerParameters": {
           "parameters": [
             {
-              "name": "project_id",
-              "value": "={{ $json.procore_project_id }}"
+              "name": "Procore-Company-Id",
+              "value": "={{ $json.procore_company_id }}"
             }
           ]
         }
@@ -86,31 +86,6 @@
     },
     {
       "parameters": {
-        "resource": "bill",
-        "operation": "create",
-        "additionalFields": {
-          "vendorRef": "={{ $json.qbo_vendor_id }}",
-          "docNumber": "={{ $json.invoice_number }}",
-          "txnDate": "={{ $json.invoice_date }}",
-          "line": [
-            {
-              "amount": "={{ $json.amount }}",
-              "detailType": "AccountBasedExpenseLineDetail",
-              "accountRef": "={{ $json.expense_account_id }}"
-            }
-          ],
-          "privateNote": "=Procore Commitment: {{ $json.match.commitment_number }} | Auto-matched ({{ $json.match_confidence }})"
-        }
-      },
-      "id": "create-qbo-bill",
-      "name": "Create Bill in QBO",
-      "type": "n8n-nodes-base.quickbooks",
-      "typeVersion": 1,
-      "position": [1170, 200],
-      "notes": "Create vendor bill in QuickBooks Online"
-    },
-    {
-      "parameters": {
         "resource": "databasePage",
         "databaseId": "={{ $env.NOTION_INVOICE_TRACKER_DB_ID }}",
         "title": "={{ $json.invoice_number }}",
@@ -121,7 +96,6 @@
             { "key": "Amount", "numberValue": "={{ $json.amount }}" },
             { "key": "Invoice Date", "dateValue": "={{ $json.invoice_date }}" },
             { "key": "Procore Commitment", "richTextValue": "={{ $json.match.commitment_number }}" },
-            { "key": "QBO Bill ID", "richTextValue": "={{ $node['Create Bill in QBO'].json.Id }}" },
             { "key": "Status", "selectValue": "Matched - Pending Approval" },
             { "key": "Match Confidence", "selectValue": "={{ $json.match_confidence }}" },
             { "key": "Entry Source", "selectValue": "={{ $json.source || 'Procore' }}" }
@@ -133,7 +107,7 @@
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2,
       "position": [1400, 200],
-      "notes": "Create Notion entry with match details"
+      "notes": "Create Notion entry with match details. NOTE: n8n does NOT create bills in QBO — SmoothX owns that sync. n8n only logs the match and notifies the PM."
     },
     {
       "parameters": {
@@ -162,13 +136,10 @@
     },
     "Match Confidence Router": {
       "main": [
-        [{ "node": "Create Bill in QBO", "type": "main", "index": 0 }],
-        [{ "node": "Create Bill in QBO", "type": "main", "index": 0 }],
-        [{ "node": "Email PM for Approval", "type": "main", "index": 0 }]
+        [{ "node": "Log in Notion", "type": "main", "index": 0 }],
+        [{ "node": "Log in Notion", "type": "main", "index": 0 }],
+        [{ "node": "Log in Notion", "type": "main", "index": 0 }]
       ]
-    },
-    "Create Bill in QBO": {
-      "main": [[{ "node": "Log in Notion", "type": "main", "index": 0 }]]
     },
     "Log in Notion": {
       "main": [[{ "node": "Email PM for Approval", "type": "main", "index": 0 }]]

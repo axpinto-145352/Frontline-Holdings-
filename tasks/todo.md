@@ -19,7 +19,9 @@
 - [x] Implementation roadmap
 
 ## Deliverables Created
-- [x] `FRONTLINE-PAYMENT-AUTOMATION.md` — Master system document
+- [x] `FRONTLINE-PAYMENT-AUTOMATION.md` — Master system architecture document
+- [x] `FRONTLINE-INTEGRATION-ROADMAP-REPORT.md` — Team-facing integration roadmap & options report
+- [x] `REVIEW-ASSESSMENT-REPORT.md` — 13-lens assessment and review findings
 - [x] `n8n-workflows/workflow-1-invoice-intake-dedup.json` — Invoice intake + dedup
 - [x] `n8n-workflows/workflow-2-procore-qbo-matching.json` — Procore-QBO matching
 - [x] `n8n-workflows/workflow-3-customer-invoice-followup.json` — Customer invoicing + follow-up

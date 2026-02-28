@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Invoice Fingerprint Generator & Normalizer\nconst crypto = require('crypto');\n\nfunction normalizeVendor(name) {\n  return name\n    .toLowerCase()\n    .replace(/\\b(llc|inc|corp|ltd|co|company|enterprises?|services?|group|contractors?)\\b/gi, '')\n    .replace(/[^a-z0-9]/g, '')\n    .trim();\n}\n\nfunction normalizeInvoiceNum(num) {\n  if (!num) return '';\n  return String(num)\n    .replace(/^(inv|invoice|#|no|num|number)[-\\.\\s:#]*/i, '')\n    .replace(/^0+/, '')\n    .trim();\n}\n\nfunction generateFingerprint(vendor, invoiceNum, amount) {\n  const normalized = `${normalizeVendor(vendor)}|${normalizeInvoiceNum(invoiceNum)}|${parseFloat(amount).toFixed(2)}`;\n  return crypto.createHash('sha256').update(normalized).digest('hex');\n}\n\nconst invoice = $input.first().json;\nconst fingerprint = generateFingerprint(\n  invoice.vendor_name,\n  invoice.invoice_number,\n  invoice.amount\n);\n\nreturn [{\n  json: {\n    ...invoice,\n    normalized_vendor: normalizeVendor(invoice.vendor_name),\n    normalized_invoice_num: normalizeInvoiceNum(invoice.invoice_number),\n    fingerprint: fingerprint,\n    processed_at: new Date().toISOString()\n  }\n}];"
+        "jsCode": "// Invoice Fingerprint Generator & Normalizer\nconst crypto = require('crypto');\n\nfunction normalizeVendor(name) {\n  return name\n    .toLowerCase()\n    .replace(/\\b(llc|inc|corp|ltd|co|company|enterprises?|services?|group|contractors?)\\b/gi, '')\n    .replace(/[^a-z0-9]/g, '')\n    .trim();\n}\n\nfunction normalizeInvoiceNum(num) {\n  if (!num) return '';\n  return String(num)\n    .replace(/^(inv|invoice|#|no|num|number)[-\\.\\s:#]*/i, '')\n    .replace(/^0+/, '')\n    .trim();\n}\n\nfunction normalizeProject(project) {\n  return (project || '')\n    .toLowerCase()\n    .replace(/[^a-z0-9]/g, '')\n    .trim();\n}\n\nfunction generateFingerprint(vendor, invoiceNum, amount, project) {\n  const normalized = `${normalizeVendor(vendor)}|${normalizeInvoiceNum(invoiceNum)}|${parseFloat(amount).toFixed(2)}|${normalizeProject(project)}`;\n  return crypto.createHash('sha256').update(normalized).digest('hex');\n}\n\nconst invoice = $input.first().json;\nconst fingerprint = generateFingerprint(\n  invoice.vendor_name,\n  invoice.invoice_number,\n  invoice.amount,\n  invoice.project_name\n);\n\nreturn [{\n  json: {\n    ...invoice,\n    normalized_vendor: normalizeVendor(invoice.vendor_name),\n    normalized_invoice_num: normalizeInvoiceNum(invoice.invoice_number),\n    fingerprint: fingerprint,\n    processed_at: new Date().toISOString()\n  }\n}];"
       },
       "id": "normalize-fingerprint",
       "name": "Normalize & Fingerprint",
@@ -78,7 +78,7 @@
         "conditions": {
           "boolean": [
             {
-              "value1": "={{ $node['Notion Dedup Check'].json.results && $node['Notion Dedup Check'].json.results.length > 0 }}",
+              "value1": "={{ ($node['Notion Dedup Check'].json.results && $node['Notion Dedup Check'].json.results.length > 0) || ($node['QBO Dedup Check'].json.QueryResponse && $node['QBO Dedup Check'].json.QueryResponse.Bill && $node['QBO Dedup Check'].json.QueryResponse.Bill.length > 0) }}",
               "value2": true
             }
           ]

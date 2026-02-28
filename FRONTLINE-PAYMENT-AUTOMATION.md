@@ -648,7 +648,7 @@ The Notion workspace serves as the **single source of truth** — the "2nd Brain
 | Procore Project ID | Text | Links to Procore |
 | Customer | Relation | Links to Customers DB |
 | PM Assigned | Person | Project manager |
-| Status | Select | Active / Complete / On Hold |
+| Status | Select | Bidding / Active / Punch List / Closed Out |
 | Total Contract | Number | Contract value |
 | Billed to Date | Rollup | Sum of invoiced amounts |
 | Remaining | Formula | Total Contract - Billed to Date |
@@ -682,11 +682,25 @@ The Notion workspace serves as the **single source of truth** — the "2nd Brain
 | Property | Type | Purpose |
 |----------|------|---------|
 | Timestamp | Date | When action occurred |
-| Action | Select | Created / Matched / Approved / Paid / Flagged |
+| Action | Select | Created / Matched / Approved / Paid / Flagged / Duplicate Blocked |
 | Invoice | Relation | Related invoice |
 | Performed By | Text | System, PM name, or AI |
 | Details | Rich Text | Full action details |
-| System | Select | n8n / QBO / Procore / Manual |
+| System | Select | n8n / QBO / Procore / Manual / AI |
+
+### Database 6: Payments
+
+| Property | Type | Purpose |
+|----------|------|---------|
+| Payment Reference | Title | Check # or ACH reference |
+| Invoice | Relation | Which invoice(s) this payment covers |
+| Vendor | Relation | Payee |
+| Amount | Number | Payment amount |
+| Payment Date | Date | Date paid |
+| Method | Select | Check / ACH / Wire |
+| QBO Payment ID | Text | QBO transaction reference |
+| Cleared | Checkbox | Bank reconciliation flag |
+| Potential Duplicate | Checkbox | Auto-flagged by dedup engine |
 
 ### 2nd Brain Views
 
@@ -973,7 +987,7 @@ return [{
 ## 10. Implementation Roadmap
 
 ### Phase 1: Foundation (Weeks 1-2)
-- [ ] Set up Notion workspace with all 5 databases
+- [ ] Set up Notion workspace with all 6 databases
 - [ ] Configure Notion views (PM Dashboard, Duplicate Board, etc.)
 - [ ] Set up n8n instance (cloud or self-hosted)
 - [ ] Configure OAuth connections: Procore, QBO, Notion

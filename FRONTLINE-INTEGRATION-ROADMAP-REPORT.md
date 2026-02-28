@@ -305,7 +305,7 @@ If the system creates more problems than it solves at any phase:
 
 | Task | Details | Owner |
 |------|---------|-------|
-| Set up Notion workspace | Create 5 databases: Invoice Tracker, Projects, Vendors, Customers, Audit Log | Dev |
+| Set up Notion workspace | Create 6 databases: Invoice Tracker, Projects, Vendors, Customers, Audit Log | Dev |
 | Configure Notion views | PM Dashboard, Duplicate Alert Board, Cash Flow Board, Project Summary, Vendor History, Audit Trail | Dev |
 | Set up n8n instance | Cloud ($50/mo) or self-hosted on existing infrastructure | Dev/IT |
 | Register Procore Developer App | Get Client ID + Client Secret for DMSA (Client Credentials grant) | Admin |
@@ -469,6 +469,7 @@ Five interconnected databases serve as the single source of truth:
 | **Vendors** | Name, Normalized Name, Procore ID, QBO ID, Contact Email, YTD Payments | Cross-system vendor mapping |
 | **Customers** | Name, QBO ID, Email, Payment Terms, Outstanding Balance | AR tracking |
 | **Audit Log** | Timestamp, Action, Invoice, Performed By, System | Complete history of every system action |
+| **Payments** | Payment Reference, Invoice, Vendor, Amount, Payment Date, Method, QBO Payment ID, Cleared, Potential Duplicate | Payment tracking with duplicate flagging |
 
 **Pre-built views:**
 - PM Dashboard — each PM's pending approvals + overdue items

@@ -136,9 +136,35 @@ For a construction company processing ~500 invoices/month with an average invoic
 | Budget | `GET /rest/v1.0/projects/{id}/budget/views` | Budget views with costs |
 | Webhooks | `POST /rest/v1.0/companies/{cid}/webhooks` | Real-time event triggers |
 
-**Authentication:** OAuth 2.0 (Authorization Code flow)
-**Rate Limits:** 3,600 requests/hour per app
-**Webhooks Available:** Yes — triggers on invoice creation, pay app submission, commitment changes
+**Authentication:** OAuth 2.0 — two supported grant types:
+
+| Grant Type | Use Case | Token Expiry |
+|-----------|----------|--------------|
+| **Authorization Code** | User-interactive apps, requires redirect URI | Reducing from 2 hours to 15 minutes |
+| **Client Credentials (DMSA)** | Server-to-server / automated workflows (recommended for n8n) | 5,400 seconds (1.5 hours) |
+
+**OAuth Endpoints:**
+
+| Environment | Authorization URL | Token URL |
+|-------------|-------------------|-----------|
+| Production | `https://login.procore.com/oauth/authorize` | `https://login.procore.com/oauth/token` |
+| Monthly Sandbox | `https://login-sandbox-monthly.procore.com/oauth/authorize` | `https://login-sandbox-monthly.procore.com/oauth/token` |
+| Dev Sandbox | `https://login-sandbox.procore.com/oauth/authorize` | `https://login-sandbox.procore.com/oauth/token` |
+
+**Important:** Procore does NOT use OAuth scopes. Permissions are controlled via Procore's project-level permission system (DMSA). All calls require the `Procore-Company-Id` header.
+
+**Rate Limits:** 3,600 requests/hour per app (can request increase to 7,200 or 14,400 via apisupport@procore.com). Rate limit headers: `X-Rate-Limit-Remaining`, `X-Rate-Limit-Reset`. Throttled = HTTP 429.
+
+**Webhooks:** Create/Update/Delete events on any API resource. Payload fields: `id`, `timestamp`, `resource_name`, `resource_id`, `event_type`, `company_id`, `project_id`. 28-day delivery history. Available resources enumerable via `GET /rest/v1.0/webhooks/resources`.
+
+**API Versioning:** Resource-level versioning (v1.0 vs v1.1 per resource, not per API). v1.1 means a breaking change to that specific resource. v2.0 introduces `"data"` wrapper, string IDs, and pagination.
+
+**n8n Connection Method:** No native Procore node exists in n8n. Use **HTTP Request node** with **Generic OAuth2 credentials**:
+1. Grant Type: `Client Credentials`
+2. Access Token URL: `https://login.procore.com/oauth/token`
+3. Client ID / Secret: From Procore Developer App
+4. Add Header: `Procore-Company-Id: <your_company_id>`
+5. n8n handles token refresh automatically
 
 **Key Procore Data for Matching:**
 - Commitment number (links to subcontract/PO)
@@ -150,28 +176,78 @@ For a construction company processing ~500 invoices/month with an average invoic
 
 ### 4.2 SmoothX (Integration Middleware — NOT an ERP)
 
-**Critical Finding:** SmoothX is **NOT an ERP system**. It is a **construction technology integration middleware provider** that specializes in connecting Procore with accounting platforms. SmoothX acts as an intelligent translation layer between systems.
+**Critical Finding:** SmoothX is **NOT an ERP system**. It is a **construction technology integration middleware provider** (smoothx.com) that specializes in connecting Procore with accounting platforms. SmoothX acts as an intelligent translation layer between systems. Listed on the Procore Marketplace as "0link QuickBooks Online Connector by Smoothx." 1,000+ Procore connections worldwide. Infrastructure runs on AWS and DigitalOcean.
 
-**SmoothX Products:**
+**SmoothX Apps on Procore Marketplace:**
 
-| Product | Description |
-|---------|-------------|
-| **Procore-Xero Connector** | Bi-directional real-time sync (1,700+ installations) |
-| **Simpro-QBO Connector** | Two-way sync between Simpro and QuickBooks Online |
-| **ProScan Plus / Extractus** | OCR-powered invoice scanning direct to Procore |
-| **SmoothAssist** | Real-time sync verification tool |
+| App | Marketplace URL | Description |
+|-----|----------------|-------------|
+| **0link QBO Connector** | marketplace.procore.com/apps/quickbooks-online-connector-by-0link | Bi-directional Procore ↔ QBO real-time sync |
+| **Smoothx Advanced Payments** | marketplace.procore.com/apps/smoothx-advanced-payments | Extended payment management |
+| **ProScan+ by Smoothx** | marketplace.procore.com/apps/proscan-by-smoothlink | OCR-powered invoice scanning into Procore |
+| **Extractus by Smoothx** | marketplace.procore.com/apps/extractus-by-smoothx | Data extraction tool |
+| **Cost+ by Smoothx** | marketplace.procore.com/apps/cost-by-smoothx | Cost-plus management |
+
+**Alternative Procore ↔ QBO Connectors (Marketplace):**
+
+| Connector | Type | Key Limitation |
+|-----------|------|----------------|
+| **Procore-built QBO Connector** | First-party (free) | New projects only; no pre-existing projects without paid Pro Services; 1 QBO company per site; no negative invoices; US-only payment import |
+| **Interfy OneCore** | Third-party | Alternative to SmoothX |
+| **SmoothX (0link)** | Third-party | Most comprehensive: retention, progress claims, attachments, payroll |
 
 **Key SmoothX Capabilities:**
 - Real-time bi-directional sync (no user interaction after onboarding)
 - Syncs: Contacts, Cost Codes, Cost Types, Commitments, Direct Costs, Progress Claims, Payroll/Timesheets
 - Attachments travel with invoices/bills (full audit trail)
 - Retention/retainage handling on progress claims
+- Construction-specific: FIDIC contract standards, multi-region tax rules
 - ERP Locking — synced items display green ERP banner in Procore and cannot be amended
-- Setup time: ~30 minutes, operational within 48 hours
+- Setup time: ~30 minutes onboarding call, operational within 48 hours
+- SmoothAssist — real-time sync status dashboard with green tick/red cross indicators
 
-**Integration Architecture:** SmoothX connects via official APIs of each platform (Procore API, Xero API, QBO API). It decouples core systems so API changes in one platform are absorbed by SmoothX's translation layer.
+**SmoothX vs n8n — What Each Can Do:**
 
-**n8n + SmoothX Coexistence:** SmoothX handles the accounting sync (Procore<>Xero/QBO) while n8n handles orchestration logic, notifications, dedup checking, and custom business rules. They complement each other.
+| Capability | SmoothX | n8n Direct Build |
+|-----------|---------|-----------------|
+| Two-way real-time invoice sync | Pre-built | Must build (weeks) |
+| Contact/vendor sync | Pre-built | Must build (days) |
+| Cost code mapping | Pre-built (CSV import) | Must build (days) |
+| Retention/retainage handling | Pre-built | Must build (complex) |
+| Progress claims | Pre-built | Must build (complex) |
+| Tax management (multi-region) | Pre-built | Must build |
+| API change maintenance | SmoothX handles | You own it forever |
+| **Custom dedup logic** | No | **Yes** |
+| **AI-powered matching** | No | **Yes** |
+| **Custom PM notifications** | No | **Yes** |
+| **Follow-up email automation** | No | **Yes** |
+| **Notion 2nd Brain logging** | No | **Yes** |
+| **Custom approval workflows** | No | **Yes** |
+
+**Do You Need SmoothX? Decision Matrix:**
+
+| Scenario | SmoothX? | Why |
+|----------|----------|-----|
+| Full Procore↔QBO financial sync (invoices, payments, contacts, retention, progress claims) | **YES** | Months of dev to replicate; ongoing maintenance |
+| Simple one-way data reads (webhook triggers, queries) | **NO** | n8n HTTP Request handles this in days |
+| Custom workflows (approvals, AI matching, notifications) | **NO** | n8n is purpose-built for this |
+| You want zero vendor lock-in | **NO** | But budget 4-8 weeks dev + ongoing maintenance |
+
+**RECOMMENDED ARCHITECTURE — Hybrid Approach:**
+
+```
+SmoothX handles:                    n8n handles:
+├─ Procore → QBO bill sync          ├─ Dedup engine (5-layer)
+├─ QBO → Procore payment sync       ├─ AI-powered invoice matching
+├─ Contact/vendor sync              ├─ Notion 2nd Brain logging
+├─ Cost code mapping                ├─ PM notification emails
+├─ Retention/retainage              ├─ Customer invoice generation
+├─ Progress claims                  ├─ Follow-up & escalation
+└─ API change absorption            ├─ Custom approval workflows
+                                    └─ Procore webhook event routing
+```
+
+**CRITICAL RULE: n8n does NOT write vendor bills to QBO.** SmoothX owns that sync. n8n READS from QBO to verify and cross-reference, and WRITES only customer invoices (which SmoothX does not handle). This eliminates the dual-write conflict.
 
 ### 4.3 QuickBooks Online (QBO)
 

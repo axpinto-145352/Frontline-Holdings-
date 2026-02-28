@@ -305,7 +305,7 @@ If the system creates more problems than it solves at any phase:
 
 | Task | Details | Owner |
 |------|---------|-------|
-| Set up Notion workspace | Create 6 databases: Invoice Tracker, Projects, Vendors, Customers, Audit Log | Dev |
+| Set up Notion workspace | Create 6 databases: Invoice Tracker, Projects, Vendors, Customers, Audit Log, Payments | Dev |
 | Configure Notion views | PM Dashboard, Duplicate Alert Board, Cash Flow Board, Project Summary, Vendor History, Audit Trail | Dev |
 | Set up n8n instance | Cloud ($50/mo) or self-hosted on existing infrastructure | Dev/IT |
 | Register Procore Developer App | Get Client ID + Client Secret for DMSA (Client Credentials grant) | Admin |
@@ -383,7 +383,7 @@ TRIGGER: Procore Webhook / Email / Manual Upload
                         "INV-001" / "#001" → "001"
     │
     ▼
-[Generate Fingerprint] ──► SHA256(normalized_vendor | normalized_invoice_num | amount)
+[Generate Fingerprint] ──► SHA256(normalized_vendor | normalized_invoice_num | amount | normalized_project)
     │
     ▼
 [Layer 1: Notion Query] ──► Exact fingerprint match? → BLOCK
@@ -460,7 +460,7 @@ TRIGGER: Notion status changed to "Approved"
 
 ## 8. Notion "2nd Brain" — What Gets Tracked
 
-Five interconnected databases serve as the single source of truth:
+Six interconnected databases serve as the single source of truth:
 
 | Database | Key Fields | Purpose |
 |----------|-----------|---------|

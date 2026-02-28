@@ -719,7 +719,7 @@ The Notion workspace serves as the **single source of truth** — the "2nd Brain
 
 ```
 Layer 1: FINGERPRINT MATCHING (Exact Match)
-  SHA256(normalize(vendor) + normalize(invoice_num) + amount)
+  SHA256(normalize(vendor) + normalize(invoice_num) + amount + normalize(project))
   -> Catches: exact same invoice entered twice
 
 Layer 2: FUZZY MATCHING (Near Match)

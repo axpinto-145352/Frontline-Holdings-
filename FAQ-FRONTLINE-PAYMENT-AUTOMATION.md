@@ -310,7 +310,7 @@ Option 1 pays for itself within the first month. Option 2 has a longer payback b
 | Procore | $0 (existing) | Already licensed |
 | QuickBooks | $0 (existing) | Already licensed |
 
-No Notion subscription. No new platforms. No per-user fees.
+No new subscriptions. No new platforms. No per-user fees.
 
 ### "Can we self-host n8n instead of using the cloud version?"
 

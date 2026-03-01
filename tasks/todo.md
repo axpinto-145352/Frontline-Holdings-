@@ -6,70 +6,64 @@
 - [x] Research SmoothX (clarified: integration middleware, NOT ERP)
 - [x] Research n8n workflow automation + available nodes
 - [x] Research QuickBooks Online API endpoints
-- [x] Research Notion API + 2nd Brain methodology
+- [x] Research Microsoft Graph API for Excel/OneDrive integration
 - [x] Research duplicate payment prevention strategies
 
 ## Design Phase (Complete)
 - [x] System architecture design
 - [x] n8n workflow design (3 workflows)
-- [x] Notion database schema design (6 databases)
+- [x] Excel approval dashboard design (4 tabs)
 - [x] Dedup engine design (5-layer strategy)
 - [x] Email template design (4 templates)
 - [x] API integration specifications
 - [x] Implementation roadmap
 
 ## Deliverables Created
-- [x] `PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md` — Client-facing proposal with 3 engagement options and pricing
-- [x] `FRONTLINE-PAYMENT-AUTOMATION.md` — Master technical architecture document (updated for 3 options)
-- [x] `FRONTLINE-INTEGRATION-ROADMAP-REPORT.md` — Team-facing integration roadmap & options report (updated for 3 options)
-- [x] `REVIEW-ASSESSMENT-REPORT.md` — 13-lens assessment and review findings (updated for 3 options)
+- [x] `PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md` — Client-facing proposal with 2 engagement options and pricing
+- [x] `FRONTLINE-PAYMENT-AUTOMATION.md` — Master technical architecture document (updated for 2 options)
+- [x] `FRONTLINE-INTEGRATION-ROADMAP-REPORT.md` — Team-facing integration roadmap & options report (updated for 2 options)
+- [x] `REVIEW-ASSESSMENT-REPORT.md` — 13-lens assessment and review findings (updated for 2 options)
 - [x] `n8n-workflows/workflow-1-invoice-intake-dedup.json` — Invoice intake + dedup
 - [x] `n8n-workflows/workflow-2-procore-qbo-matching.json` — Procore-QBO matching
 - [x] `n8n-workflows/workflow-3-customer-invoice-followup.json` — Customer invoicing + follow-up
-- [x] `notion-2nd-brain/SETUP-GUIDE.md` — Notion database setup guide (Options 2 & 3)
+- [x] `notion-2nd-brain/SETUP-GUIDE.md` — Notion database setup guide (reference only — not in current proposal)
 
 ## Engagement Options (Client Decision Pending)
 
-### Option 1 — Gap-Filler ($14,000 / 8 weeks)
+### Option 1 — Approval Gate + Gap-Filler ($12,000 / 10 weeks) — RECOMMENDED
+- Human approval gate via Excel dashboard in OneDrive
 - n8n fills SmoothX gaps (dedup, matching, invoicing, follow-up)
-- SmoothX stays. No Notion. Email-based PM approvals.
-- Monthly run-rate: ~$70-150/mo
+- SmoothX stays. Excel approval dashboard. PM approves via Excel.
+- Monthly run-rate: ~$70-130/mo (new costs)
+- Total monthly (incl. existing SmoothX): ~$270-630/mo
 
-### Option 2 — Gap-Filler + 2nd Brain ($22,000 / 12 weeks) — RECOMMENDED
-- Everything in Option 1 + full Notion workspace as 2nd source of truth
-- 6 databases, PM dashboards, one-click approvals, business-user audit trail
-- Monthly run-rate: ~$120-200/mo (new costs) / ~$320-700/mo (incl. existing SmoothX)
-
-### Option 3 — Full Replacement ($42,000 / 20 weeks)
-- Everything in Option 2 + complete SmoothX replacement
+### Option 2 — Full Replacement ($32,000 / 18 weeks)
+- Everything in Option 1 + complete SmoothX replacement
 - n8n handles bill sync, payment sync, retention, progress claims
-- Monthly run-rate: ~$120-200/mo (SmoothX eliminated)
+- Monthly run-rate: ~$70-130/mo (SmoothX eliminated)
 
 ## Implementation Phase (Pending Client Decision)
 
-### All Options
+### Both Options
 - [ ] Set up n8n instance (cloud or self-hosted)
 - [ ] Register Procore Developer App + configure DMSA
-- [ ] Configure OAuth: Procore, QBO
+- [ ] Configure OAuth: Procore, QBO, Microsoft Graph API
+- [ ] Register Azure app for Microsoft Graph API access
+- [ ] Create Excel approval dashboard template in OneDrive
 - [ ] Import + normalize existing vendor list
+- [ ] Build Excel dashboard integration (Microsoft Graph API read/write)
+- [ ] Build PM approval workflow (poll Excel every 5 min)
+- [ ] Build auto-escalation (4-hour timeout)
 - [ ] Build Workflow 1: Invoice Intake & 5-Layer Dedup
 - [ ] Build Workflow 2: Procore-QBO AI Matching
 - [ ] Build Workflow 3: Customer Invoice + Follow-Up
 - [ ] Test with historical duplicate invoices
 - [ ] Tune matching thresholds
-- [ ] PM training
+- [ ] PM training (30-min walkthrough)
 - [ ] Parallel run (old + new system)
 - [ ] Full rollout
 
-### Options 2 & 3 Only
-- [ ] Set up Notion workspace with 6 databases
-- [ ] Configure Notion views (PM Dashboard, Duplicate Board, etc.)
-- [ ] Configure Notion API integration
-- [ ] Notion-backed dedup and audit trail
-- [ ] Dashboard refinement based on pilot feedback
-- [ ] Leadership training on Notion dashboards
-
-### Option 3 Only
+### Option 2 Only
 - [ ] Build Procore → QBO vendor bill sync workflow
 - [ ] Build QBO → Procore payment status sync workflow
 - [ ] Build contact/vendor sync workflow
@@ -80,7 +74,7 @@
 - [ ] SmoothX cutover and subscription cancellation
 
 ## Next Steps (Client Action Required)
-- [ ] Review proposal and select engagement option (1, 2, or 3)
+- [ ] Schedule audit call (60-90 min, free) with Veteran Vectors
+- [ ] Review proposal and select engagement option (1 or 2)
 - [ ] Identify executive sponsor
-- [ ] Schedule walkthrough call with Veteran Vectors
-- [ ] Sign Statement of Work (SOW)
+- [ ] Sign Statement of Work (SOW) — 50% payment, building within 48 hours

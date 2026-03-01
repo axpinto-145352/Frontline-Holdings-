@@ -86,42 +86,49 @@
     },
     {
       "parameters": {
-        "resource": "databasePage",
-        "databaseId": "={{ $env.NOTION_INVOICE_TRACKER_DB_ID }}",
-        "title": "={{ $json.invoice_number }}",
-        "propertiesUi": {
-          "propertyValues": [
-            { "key": "Fingerprint", "richTextValue": "={{ $json.fingerprint }}" },
-            { "key": "Vendor", "selectValue": "={{ $json.vendor_name }}" },
-            { "key": "Amount", "numberValue": "={{ $json.amount }}" },
-            { "key": "Invoice Date", "dateValue": "={{ $json.invoice_date }}" },
-            { "key": "Procore Commitment", "richTextValue": "={{ $json.match.commitment_number }}" },
-            { "key": "Status", "selectValue": "Matched - Pending Approval" },
-            { "key": "Match Confidence", "selectValue": "={{ $json.match_confidence }}" },
-            { "key": "Entry Source", "selectValue": "={{ $json.source || 'Procore' }}" }
+        "method": "POST",
+        "url": "=https://graph.microsoft.com/v1.0/me/drive/items/{{ $env.ONEDRIVE_EXCEL_FILE_ID }}/workbook/tables/PendingApprovals/rows/add",
+        "authentication": "oAuth2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
-        }
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "values",
+              "value": "=[[\"{{ $json.invoice_number }}\", \"{{ $json.fingerprint }}\", \"{{ $json.vendor_name }}\", {{ $json.amount }}, \"{{ $json.invoice_date }}\", \"{{ $json.project_name }}\", \"{{ $json.match.commitment_number }}\", \"{{ $json.match_confidence }}\", {{ $json.match_score }}, \"\", \"{{ $json.pm_email }}\", \"{{ new Date().toISOString() }}\"]]"
+            }
+          ]
+        },
+        "options": {}
       },
-      "id": "notion-log-matched",
-      "name": "Log in Notion",
-      "type": "n8n-nodes-base.notion",
-      "typeVersion": 2,
+      "id": "excel-log-matched",
+      "name": "Log in Excel Dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
       "position": [1400, 200],
-      "notes": "Create Notion entry with match details. NOTE: n8n does NOT create bills in QBO — SmoothX owns that sync. n8n only logs the match and notifies the PM."
+      "notes": "Add row to Pending Approvals tab in Excel. Decision column left blank for PM to type APPROVE or HOLD. NOTE: n8n does NOT create bills in QBO — SmoothX owns that sync. n8n only logs the match and notifies the PM."
     },
     {
       "parameters": {
         "sendTo": "={{ $json.pm_email }}",
         "subject": "=Invoice Ready for Review - {{ $json.vendor_name }} ${{ $json.amount }} - {{ $json.project_name }}",
         "emailType": "html",
-        "message": "=<h2>Invoice Matched to Procore Commitment</h2>\n<table border='1' cellpadding='8'>\n<tr><td><strong>Vendor</strong></td><td>{{ $json.vendor_name }}</td></tr>\n<tr><td><strong>Invoice #</strong></td><td>{{ $json.invoice_number }}</td></tr>\n<tr><td><strong>Amount</strong></td><td>${{ $json.amount }}</td></tr>\n<tr><td><strong>Project</strong></td><td>{{ $json.project_name }}</td></tr>\n</table>\n<h3>Procore Match</h3>\n<table border='1' cellpadding='8'>\n<tr><td><strong>Commitment</strong></td><td>#{{ $json.match.commitment_number }}</td></tr>\n<tr><td><strong>Committed Amount</strong></td><td>${{ $json.match.committed_amount }}</td></tr>\n<tr><td><strong>Previously Billed</strong></td><td>${{ $json.match.billed_to_date }}</td></tr>\n<tr><td><strong>This Invoice</strong></td><td>${{ $json.amount }}</td></tr>\n<tr><td><strong>Remaining After</strong></td><td>${{ $json.match.remaining - $json.amount }}</td></tr>\n<tr><td><strong>Match Confidence</strong></td><td>{{ $json.match_confidence }} ({{ $json.match_score }}%)</td></tr>\n</table>\n<p><a href='{{ $json.notion_link }}'>APPROVE or REJECT in Notion Dashboard</a></p>\n<p>— Frontline Payment Automation System</p>"
+        "message": "=<h2>Invoice Matched to Procore Commitment</h2>\n<table border='1' cellpadding='8'>\n<tr><td><strong>Vendor</strong></td><td>{{ $json.vendor_name }}</td></tr>\n<tr><td><strong>Invoice #</strong></td><td>{{ $json.invoice_number }}</td></tr>\n<tr><td><strong>Amount</strong></td><td>${{ $json.amount }}</td></tr>\n<tr><td><strong>Project</strong></td><td>{{ $json.project_name }}</td></tr>\n</table>\n<h3>Procore Match</h3>\n<table border='1' cellpadding='8'>\n<tr><td><strong>Commitment</strong></td><td>#{{ $json.match.commitment_number }}</td></tr>\n<tr><td><strong>Committed Amount</strong></td><td>${{ $json.match.committed_amount }}</td></tr>\n<tr><td><strong>Previously Billed</strong></td><td>${{ $json.match.billed_to_date }}</td></tr>\n<tr><td><strong>This Invoice</strong></td><td>${{ $json.amount }}</td></tr>\n<tr><td><strong>Remaining After</strong></td><td>${{ $json.match.remaining - $json.amount }}</td></tr>\n<tr><td><strong>Match Confidence</strong></td><td>{{ $json.match_confidence }} ({{ $json.match_score }}%)</td></tr>\n</table>\n<p>Open the <a href='{{ $env.EXCEL_DASHBOARD_URL }}'>Excel Dashboard</a> and type APPROVE or HOLD in the Decision column.</p>\n<p>If no action is taken within 4 hours, this invoice will be escalated automatically.</p>\n<p>— Frontline Payment Automation System</p>"
       },
       "id": "email-pm-approval",
       "name": "Email PM for Approval",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2,
       "position": [1630, 200],
-      "notes": "Send PM invoice details with Procore match for approval"
+      "notes": "Send PM invoice details with Procore match — directs PM to Excel dashboard for APPROVE/HOLD decision"
     }
   ],
   "connections": {
@@ -136,12 +143,12 @@
     },
     "Match Confidence Router": {
       "main": [
-        [{ "node": "Log in Notion", "type": "main", "index": 0 }],
-        [{ "node": "Log in Notion", "type": "main", "index": 0 }],
-        [{ "node": "Log in Notion", "type": "main", "index": 0 }]
+        [{ "node": "Log in Excel Dashboard", "type": "main", "index": 0 }],
+        [{ "node": "Log in Excel Dashboard", "type": "main", "index": 0 }],
+        [{ "node": "Log in Excel Dashboard", "type": "main", "index": 0 }]
       ]
     },
-    "Log in Notion": {
+    "Log in Excel Dashboard": {
       "main": [[{ "node": "Email PM for Approval", "type": "main", "index": 0 }]]
     }
   },

@@ -1,9 +1,11 @@
 # Notion 2nd Brain Setup Guide for Frontline Holdings
 ## 2nd Source of Truth — Invoice, Payment & Project Tracking
 
-> **Applies to:** Proposal Option 2 (Gap-Filler + 2nd Brain) and Option 3 (Full Replacement) only.
-> Option 1 (Gap-Filler) does not include Notion — skip this guide if Option 1 is selected.
-> See `PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md` for option details and pricing.
+> **STATUS: REFERENCE ONLY — NOT IN CURRENT PROPOSAL**
+>
+> As of Proposal v3.0, Notion is **not included** in either engagement option. The approval dashboard and audit trail have been moved to **Excel in OneDrive** (via Microsoft Graph API), which uses Frontline's existing Microsoft 365 subscription — no new platform, no new logins.
+>
+> This guide is retained as reference material in case Notion is considered for a future phase. See `PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md` for the current engagement options and pricing.
 
 ---
 

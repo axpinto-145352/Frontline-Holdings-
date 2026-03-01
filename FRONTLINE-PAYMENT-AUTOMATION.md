@@ -2,15 +2,14 @@
 ## AI-Powered Invoice Matching & Duplicate Payment Prevention
 
 **Date:** 2026-02-28
-**Version:** 2.0
+**Version:** 3.0
 **Prepared for:** Frontline Holdings Team
 **Prepared by:** Veteran Vectors
-**System:** QBO <> Procore <> Notion (2nd Brain) <> n8n Orchestration
+**System:** QBO <> Procore <> Excel/OneDrive <> n8n Orchestration
 
-> **Engagement options:** This technical architecture document supports all three engagement options presented in the client proposal (`PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md`):
-> - **Option 1 — Gap-Filler ($14,000):** Sections 1-6, 8-9 apply. Section 7 (Notion) does not apply.
-> - **Option 2 — Gap-Filler + 2nd Brain ($22,000):** All sections apply.
-> - **Option 3 — Full Replacement ($42,000):** All sections apply, plus additional SmoothX replacement workflows (detailed in the proposal, Phases 5-6).
+> **Engagement options:** This technical architecture document supports both engagement options presented in the client proposal (`PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md`):
+> - **Option 1 — Approval Gate + Gap-Filler ($12,000):** Sections 1-6, 8-9 apply. Section 7 (Excel Approval Dashboard) applies.
+> - **Option 2 — Full Replacement ($32,000):** All sections apply, plus SmoothX replacement workflows.
 
 ---
 
@@ -22,7 +21,7 @@
 4. [Technology Stack Research](#technology-stack)
 5. [System Architecture](#system-architecture)
 6. [n8n Workflow Design](#n8n-workflow-design)
-7. [Notion 2nd Brain Setup](#notion-2nd-brain)
+7. [Excel Approval Dashboard Setup](#excel-approval-dashboard)
 8. [Duplicate Payment Prevention Engine](#duplicate-payment-prevention)
 9. [API Integration Specifications](#api-specifications)
 10. [Implementation Roadmap](#implementation-roadmap)
@@ -31,7 +30,7 @@
 
 ## 1. Executive Summary
 
-Frontline Holdings, a construction/general contracting company, is experiencing **critical financial losses from duplicate and triple payments** due to disconnected systems between their project management (Procore), accounting (QuickBooks Online), and integration middleware (SmoothX). This document outlines a complete automation system using **n8n workflow automation** as the orchestration layer, **Notion as a 2nd Brain/source of truth** (Options 2 & 3), and **AI-powered matching logic** to eliminate duplicate payments and streamline the invoice-to-payment lifecycle.
+Frontline Holdings, a construction/general contracting company, is experiencing **critical financial losses from duplicate and triple payments** due to disconnected systems between their project management (Procore), accounting (QuickBooks Online), and integration middleware (SmoothX). This document outlines a complete automation system using **n8n workflow automation** as the orchestration layer, **an Excel approval dashboard in OneDrive** for human sign-off and audit trail, and **AI-powered matching logic** to eliminate duplicate payments and streamline the invoice-to-payment lifecycle.
 
 ### Key Outcomes (All Options)
 - **Eliminate 100% of duplicate/triple payments** through automated 5-layer deduplication
@@ -39,12 +38,13 @@ Frontline Holdings, a construction/general contracting company, is experiencing 
 - **Automated PM notifications** with follow-up email sequences
 - **Customer invoice automation** with 3-tier escalation for overdue invoices
 
-### Additional Outcomes (Options 2 & 3)
-- **Centralized 2nd source of truth** in Notion for all payment status tracking
-- **Real-time dashboards** for PMs, Finance, and Leadership
-- **Full audit trail database** from invoice receipt to customer payment
+### Additional Outcomes (Both Options)
+- **Human approval gate** — nothing hits QBO without PM sign-off via Excel
+- **Centralized approval dashboard** in Excel/OneDrive for all payment status tracking
+- **Real-time visibility** for PMs via shared Excel file in OneDrive
+- **Full audit trail** in Excel Audit Log tab from invoice receipt to customer payment
 
-### Additional Outcomes (Option 3 Only)
+### Additional Outcomes (Option 2 Only)
 - **SmoothX eliminated** — complete Procore↔QBO sync handled by n8n
 - **No vendor dependency** — full control over every data flow
 
@@ -120,10 +120,10 @@ Frontline Holdings operates in the construction industry as a **general contract
 6. **No approval workflow** — payments go out without matching against commitments
 
 ### Financial Impact
-For a construction company processing ~500 invoices/month with an average invoice of $15,000:
-- **Even a 2% duplicate rate = $150,000/month in overpayments**
+Last year, Frontline lost **$150,000 to duplicate payments** — a confirmed, validated number. Based on industry benchmarks for a construction company processing ~500 invoices/month with an average invoice of $15,000:
+- **A 2% duplicate rate on 500 invoices/month at $15,000 average = up to $150,000/month in theoretical exposure**
 - Recovery rate on duplicate payments in construction: ~60% (40% is lost)
-- **Annual exposure: $720,000+ in potential duplicate payment losses**
+- **$150,000 confirmed loss last year provides the ROI basis for this engagement**
 
 ---
 
@@ -235,7 +235,7 @@ For a construction company processing ~500 invoices/month with an average invoic
 | **AI-powered matching** | No | **Yes** |
 | **Custom PM notifications** | No | **Yes** |
 | **Follow-up email automation** | No | **Yes** |
-| **Notion 2nd Brain logging** | No | **Yes** |
+| **Excel approval dashboard logging** | No | **Yes** |
 | **Custom approval workflows** | No | **Yes** |
 
 **Do You Need SmoothX? Decision Matrix:**
@@ -253,11 +253,12 @@ For a construction company processing ~500 invoices/month with an average invoic
 SmoothX handles:                    n8n handles:
 ├─ Procore → QBO bill sync          ├─ Dedup engine (5-layer)
 ├─ QBO → Procore payment sync       ├─ AI-powered invoice matching
-├─ Contact/vendor sync              ├─ Notion 2nd Brain logging
-├─ Cost code mapping                ├─ PM notification emails
-├─ Retention/retainage              ├─ Customer invoice generation
-├─ Progress claims                  ├─ Follow-up & escalation
-└─ API change absorption            ├─ Custom approval workflows
+├─ Contact/vendor sync              ├─ Excel approval dashboard (Graph API)
+├─ Cost code mapping                ├─ Human approval gate (Excel)
+├─ Retention/retainage              ├─ PM notification emails
+├─ Progress claims                  ├─ Customer invoice generation
+└─ API change absorption            ├─ Follow-up & escalation
+                                    ├─ Custom approval workflows
                                     └─ Procore webhook event routing
 ```
 
@@ -295,7 +296,7 @@ SELECT * FROM Bill WHERE VendorRef = '{vendor_id}'
 | Node | Purpose | Status |
 |------|---------|--------|
 | **QuickBooks** | Full QBO API access | Native node |
-| **Notion** | Database CRUD, page creation | Native node |
+| **Microsoft Graph / HTTP Request** | Excel dashboard read/write via HTTP Request | Generic node (OAuth2) |
 | **HTTP Request** | Procore API + SmoothX API | Generic node |
 | **Gmail / SMTP** | Send invoices + PM notifications | Native node |
 | **Webhook** | Receive Procore events | Native trigger |
@@ -309,28 +310,35 @@ SELECT * FROM Bill WHERE VendorRef = '{vendor_id}'
 - Can use AI to normalize vendor names, invoice numbers
 - Can generate follow-up email content dynamically
 
-### 4.5 Notion as 2nd Brain
+### 4.5 Microsoft Graph API / Excel in OneDrive
 
-**API Capabilities:**
+**What it is:** A shared Excel file hosted in OneDrive, accessed programmatically via the Microsoft Graph API. Serves as the approval dashboard and audit trail — PMs review and approve invoices directly in the Excel file, and n8n reads/writes to it via Graph API.
+**Key API Endpoints:**
 
 | API Resource | Endpoint | Purpose |
 |-------------|----------|---------|
-| Databases | `POST /v1/databases` | Create tracking databases |
-| Database Query | `POST /v1/databases/{id}/query` | Query with filters |
-| Pages | `POST /v1/pages` | Create records (invoice entries) |
-| Page Update | `PATCH /v1/pages/{id}` | Update status, add notes |
-| Search | `POST /v1/search` | Full-text search across workspace |
-| Blocks | `GET /v1/blocks/{id}/children` | Read page content |
+| Workbook Session | `POST /drives/{id}/items/{id}/workbook/createSession` | Create persistent session for batch operations |
+| Table Rows | `POST /drives/{id}/items/{id}/workbook/tables/{name}/rows` | Add rows to Excel table |
+| Table Rows (Read) | `GET /drives/{id}/items/{id}/workbook/tables/{name}/rows` | Read all rows from table |
+| Range Read | `GET /drives/{id}/items/{id}/workbook/worksheets/{name}/range(address='{range}')` | Read specific cell range |
+| Range Write | `PATCH /drives/{id}/items/{id}/workbook/worksheets/{name}/range(address='{range}')` | Write to specific cell range |
+| Drive Items | `GET /drives/{id}/items/{id}` | Get file metadata, sharing links |
+| Worksheets | `GET /drives/{id}/items/{id}/workbook/worksheets` | List all tabs/sheets |
 
-**Authentication:** Internal integration token or OAuth 2.0
-**Rate Limit:** 3 requests/second
-**n8n Notion Node:** Full native support — create, read, update, query databases
+**Authentication:** Azure AD OAuth 2.0 (app registration in Azure portal)
+- Grant Type: Authorization Code or Client Credentials
+- Scopes: `Files.ReadWrite`, `Sites.ReadWrite.All`
+- Token URL: `https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token`
+
+**Rate Limit:** 10,000 requests per 10 minutes per app per tenant
+
+**n8n Connection Method:** Use **HTTP Request node** with **Generic OAuth2 credentials** pointed at Microsoft Graph API. No native Excel/OneDrive node required — the HTTP Request node handles all CRUD operations on the Excel file via REST.
 
 ---
 
 ## 5. System Architecture
 
-> **Applies to:** All options. The architecture below shows the full system (Option 2). For Option 1, remove Notion — dedup data is stored in n8n's internal datastore and QBO custom fields, and PM approvals are email-only. For Option 3, SmoothX is removed and its sync responsibilities are absorbed by additional n8n workflows.
+> **Applies to:** Both options. The architecture below shows the full system. For Option 1, the Excel approval dashboard is included and SmoothX remains for Procore-QBO sync. For Option 2, SmoothX is removed and its sync responsibilities are absorbed by additional n8n workflows.
 
 ### High-Level Architecture
 
@@ -364,9 +372,9 @@ SELECT * FROM Bill WHERE VendorRef = '{vendor_id}'
          v                        v                        v
 +------------------+     +------------------+     +------------------+
 |                  |     |                  |     |                  |
-|   NOTION         |     |     EMAIL        |     |   AI ENGINE     |
-|   (2nd Brain)    |     | (Gmail/SMTP)     |     |  (Claude API)   |
-|   2nd Brain       |     |                  |     |                  |
+| EXCEL/ONEDRIVE   |     |     EMAIL        |     |   AI ENGINE     |
+| (Dashboard)      |     | (Gmail/SMTP)     |     |  (Claude API)   |
+|                  |     |                  |     |                  |
 +------------------+     +------------------+     +------------------+
 ```
 
@@ -382,12 +390,12 @@ Step 2: NORMALIZE & FINGERPRINT
   Creates unique fingerprint hash
        |
 Step 3: DEDUPLICATION CHECK
-  Query Notion 2nd Brain: "Does this fingerprint exist?"
+  Check Excel tracking spreadsheet via Graph API: "Does this fingerprint exist?"
   Query QBO: "Matching bill for this vendor + amount + date range?"
   Query Procore: "Matching pay application?"
        |
   IF DUPLICATE FOUND:
-    -> Flag in Notion as "DUPLICATE DETECTED"
+    -> Flag in Excel as "DUPLICATE DETECTED"
     -> Alert PM via email
     -> STOP processing (do not create bill)
        |
@@ -406,8 +414,8 @@ Step 5: VERIFY IN QBO (READ-ONLY)
   Cross-reference Procore commitment with QBO bill record
   Confirm bill exists and amounts match
        |
-Step 6: LOG IN NOTION (2nd Brain)
-  Create entry in Invoice Tracker database:
+Step 6: LOG IN EXCEL APPROVAL DASHBOARD
+  Create entry in Excel tracking spreadsheet via Graph API:
     - Invoice #, Vendor, Amount, Project
     - Procore Commitment Ref
     - QBO Bill ID
@@ -420,13 +428,13 @@ Step 7: PM NOTIFICATION
     - Invoice details
     - Procore commitment match result
     - One-click approve/reject link
-    - Dashboard link (Notion)
+    - Dashboard link (Excel in OneDrive)
        |
 Step 8: CUSTOMER INVOICE GENERATION
   Once approved:
     - Generate customer invoice in QBO
     - Email invoice to customer
-    - Log in Notion with "Invoiced" status
+    - Log in Excel with "Invoiced" status
        |
 Step 9: FOLLOW-UP AUTOMATION
   If unpaid after X days:
@@ -458,8 +466,8 @@ TRIGGER: Webhook (Procore) / Email Trigger / Manual Upload
   - Generate fingerprint: SHA256(normalized_vendor + normalized_invoice_num + amount + project)
     |
     v
-[Dedup Check - Notion Query]
-  - Query Notion Invoice Tracker: filter by fingerprint
+[Dedup Check - Excel Query via Graph API]
+  - Read Excel invoice tracking spreadsheet: filter by fingerprint
   - If match found -> DUPLICATE PATH
     |
     v
@@ -478,7 +486,7 @@ TRIGGER: Webhook (Procore) / Email Trigger / Manual Upload
   YES                        NO
   |                          |
   v                          v
-[Create Notion Entry:       [Continue to
+[Create Excel Entry:        [Continue to
  Status = "DUPLICATE"]       Matching Workflow]
   |
   v
@@ -522,7 +530,7 @@ TRIGGER: Receives clean (non-duplicate) invoice from Workflow 1
  n8n logs the match and notifies the PM.]
     |
     v
-[Create Notion Entry]
+[Create Excel Entry via Graph API]
   - Invoice #, Vendor, Amount
   - Procore Commitment Ref
   - Match Confidence
@@ -533,16 +541,16 @@ TRIGGER: Receives clean (non-duplicate) invoice from Workflow 1
 [Email PM]
   - Invoice matched to Procore commitment #{X}
   - Match confidence: HIGH
-  - Review and approve: [Link to Notion dashboard]
+  - Review and approve: [Link to Excel dashboard in OneDrive]
 ```
 
 ### Workflow 3: Customer Invoice & Follow-Up
 
 ```
-TRIGGER: Notion webhook or n8n schedule - checks for approved invoices
+TRIGGER: n8n schedule (5-minute polling) - checks Excel for approved invoices
     |
     v
-[Query Notion: Status = "Approved by PM"]
+[Read Excel via Graph API: Decision = "APPROVE"]
     |
     v
 [Generate Customer Invoice in QBO]
@@ -557,7 +565,7 @@ TRIGGER: Notion webhook or n8n schedule - checks for approved invoices
   - Or QBO native email
     |
     v
-[Update Notion Entry]
+[Update Excel Entry via Graph API]
   - Status: "Invoiced to Customer"
   - Invoice sent date
   - QBO Invoice ID
@@ -565,7 +573,7 @@ TRIGGER: Notion webhook or n8n schedule - checks for approved invoices
     v
 [Email PM Confirmation]
   - "Invoice #{X} sent to {Customer} for ${Amount}"
-  - Link to Notion dashboard
+  - Link to Excel dashboard in OneDrive
     |
     v
 [Schedule Follow-Up]
@@ -579,7 +587,7 @@ TRIGGER: Notion webhook or n8n schedule - checks for approved invoices
 TRIGGER: n8n Cron - runs daily
     |
     v
-[Query Notion: Status = "Invoiced" AND DaysSinceSent > NetTerms]
+[Read Excel via Graph API: Status = "Invoiced" AND DaysSinceSent > NetTerms]
     |
     v
 [For Each Overdue Invoice]
@@ -587,7 +595,7 @@ TRIGGER: n8n Cron - runs daily
     v
 [Check QBO Payment Status]
   - Query QBO: has payment been received?
-  - If paid -> update Notion to "Paid" -> SKIP
+  - If paid -> update Excel to "Paid" -> SKIP
     |
     v
 [Switch: Days Overdue]
@@ -604,7 +612,7 @@ TRIGGER: n8n Cron - runs daily
                  CC PM]         Flag Critical]
     |
     v
-[Update Notion]
+[Update Excel via Graph API]
   - Follow-up count + 1
   - Last follow-up date
   - Status: "Follow-Up Sent"
@@ -612,122 +620,117 @@ TRIGGER: n8n Cron - runs daily
 
 ---
 
-## 7. Notion 2nd Brain Setup
+## 7. Excel Approval Dashboard Setup
 
-> **Applies to:** Options 2 and 3 only. Option 1 (Gap-Filler) does not include Notion. If Option 1 is selected, skip this section — dedup data is stored in n8n's internal datastore and QBO custom fields, PM approvals are email-based, and reporting uses Procore + QBO native tools.
+> **Applies to:** Both options. The Excel approval dashboard is the core human approval gate for the entire system. Nothing hits QBO without PM sign-off in this spreadsheet.
 
-### Database Architecture
+### Overview
 
-The Notion workspace serves as the **2nd source of truth** — the "2nd Brain" that aggregates data from Procore and QBO into a unified operational dashboard. Procore and QBO remain the systems of record for financial transactions; Notion provides centralized visibility, dashboards, and an audit trail.
+A shared Excel file hosted in OneDrive serves as the **approval dashboard and audit trail**. PMs open the familiar Excel interface to review pending invoices, mark decisions (APPROVE or HOLD), and track status. n8n reads and writes to this file via the Microsoft Graph API on a 5-minute polling interval.
 
-### Database 1: Invoice Tracker (Master)
+Procore and QBO remain the systems of record for financial transactions; the Excel dashboard provides centralized visibility, human approval gating, and a complete audit trail.
 
-| Property | Type | Purpose |
-|----------|------|---------|
-| Invoice ID | Title | Unique identifier |
-| Fingerprint | Text | SHA256 dedup hash |
-| Vendor | Select | Normalized vendor name |
-| Amount | Number (Currency) | Invoice amount |
-| Invoice Date | Date | Date on invoice |
-| Project | Relation | Links to Projects DB |
+### Excel File Structure
+
+The Excel workbook contains 4 tabs (worksheets):
+
+### Tab 1: Pending Approvals
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| Invoice # | Text | Unique invoice identifier |
+| Vendor | Text | Normalized vendor name |
+| Amount | Currency | Invoice amount |
+| Project | Text | Project name |
 | Procore Commitment | Text | Commitment ID from Procore |
+| Match Confidence | Text | HIGH / MEDIUM / LOW / MANUAL |
+| Decision | Text | **APPROVE** / **HOLD** (PM fills this in) |
+| PM | Text | Responsible PM name |
+| Timestamp | DateTime | When row was created by n8n |
+| Fingerprint | Text | SHA256 dedup hash |
 | QBO Bill ID | Text | Bill ID in QuickBooks |
-| QBO Invoice ID | Text | Customer invoice ID in QBO |
-| Status | Select | See status values below |
-| Match Confidence | Select | HIGH / MEDIUM / LOW / MANUAL |
-| PM Assigned | Person | Responsible PM |
-| Duplicate Of | Relation | Links to original if duplicate |
-| Entry Source | Select | Email / Procore / Manual / SmoothX |
-| Created By | Text | System or user who created entry |
-| Approval Date | Date | When PM approved |
-| Invoiced Date | Date | When sent to customer |
+| Entry Source | Text | Email / Procore / Manual / SmoothX |
+| Notes | Text | PM notes, AI matching details |
+
+**How it works:** n8n writes new rows to this tab when invoices are matched. PMs open the Excel file, review the rows, and type `APPROVE` or `HOLD` in the Decision column. n8n polls every 5 minutes, reads decisions, and processes approved invoices.
+
+### Tab 2: Recently Processed
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| Invoice # | Text | Invoice identifier |
+| Vendor | Text | Vendor name |
+| Amount | Currency | Invoice amount |
+| Project | Text | Project name |
+| Status | Text | Approved / Rejected / Invoiced to Customer / Paid |
+| Decision By | Text | PM who approved/rejected |
+| Decision Date | DateTime | When decision was made |
+| QBO Invoice ID | Text | Customer invoice ID (if generated) |
+| Customer Invoiced Date | DateTime | When customer was invoiced |
 | Payment Due | Date | Net terms deadline |
 | Payment Received | Date | When customer paid |
 | Follow-Up Count | Number | Number of reminders sent |
-| Notes | Rich Text | PM notes, AI matching details |
 
-**Status Values:**
-- `Received` - Invoice captured, processing
-- `Duplicate Detected` - Flagged as potential duplicate
-- `Matched - Pending Approval` - Matched to Procore, awaiting PM
-- `Needs Manual Match` - AI couldn't auto-match, PM must assign
-- `Approved` - PM approved, ready to invoice customer
-- `Rejected` - PM rejected (with reason)
-- `Invoiced to Customer` - Customer invoice sent
-- `Follow-Up Sent` - Reminder sent to customer
-- `Paid` - Payment received
-- `Overdue - Escalated` - Past due, escalated to finance
+### Tab 3: Duplicate Alerts
 
-### Database 2: Projects
+| Column | Type | Purpose |
+|--------|------|---------|
+| Invoice # | Text | Flagged invoice identifier |
+| Vendor | Text | Vendor name |
+| Amount | Currency | Invoice amount |
+| Project | Text | Project name |
+| Match Type | Text | EXACT / FUZZY / AMOUNT_WINDOW / OVER_COMMITMENT / AI_FLAGGED |
+| Confidence | Text | Percentage match confidence |
+| Original Invoice # | Text | The invoice this is a duplicate of |
+| Original Date | DateTime | When original was entered |
+| Action | Text | BLOCKED / HELD_FOR_REVIEW |
+| PM | Text | PM notified |
+| Timestamp | DateTime | When duplicate was detected |
 
-| Property | Type | Purpose |
-|----------|------|---------|
-| Project Name | Title | Project identifier |
-| Procore Project ID | Text | Links to Procore |
-| Customer | Relation | Links to Customers DB |
-| PM Assigned | Person | Project manager |
-| Status | Select | Bidding / Active / Punch List / Closed Out |
-| Total Contract | Number | Contract value |
-| Billed to Date | Rollup | Sum of invoiced amounts |
-| Remaining | Formula | Total Contract - Billed to Date |
-| Invoices | Relation | All related invoices |
+### Tab 4: Audit Log
 
-### Database 3: Vendors
-
-| Property | Type | Purpose |
-|----------|------|---------|
-| Vendor Name | Title | Company name |
-| Normalized Name | Text | For dedup matching |
-| Procore Vendor ID | Text | Procore reference |
-| QBO Vendor ID | Text | QBO reference |
-| SmoothX Vendor ID | Text | SmoothX reference |
-| Contact Email | Email | Primary contact |
-| Total Paid YTD | Rollup | Year-to-date payments |
-| Active Commitments | Number | Open commitments count |
-
-### Database 4: Customers
-
-| Property | Type | Purpose |
-|----------|------|---------|
-| Customer Name | Title | Customer/owner name |
-| QBO Customer ID | Text | QBO reference |
-| Contact Email | Email | Billing contact |
-| Payment Terms | Select | Net 30 / Net 45 / Net 60 |
-| Outstanding Balance | Rollup | Unpaid invoice total |
-
-### Database 5: Audit Log
-
-| Property | Type | Purpose |
-|----------|------|---------|
-| Timestamp | Date | When action occurred |
-| Action | Select | Created / Matched / Approved / Paid / Flagged / Duplicate Blocked |
-| Invoice | Relation | Related invoice |
+| Column | Type | Purpose |
+|--------|------|---------|
+| Timestamp | DateTime | When action occurred |
+| Action | Text | Created / Matched / Approved / Paid / Flagged / Duplicate Blocked |
+| Invoice # | Text | Related invoice |
 | Performed By | Text | System, PM name, or AI |
-| Details | Rich Text | Full action details |
-| System | Select | n8n / QBO / Procore / Manual / AI |
+| Details | Text | Full action details |
+| System | Text | n8n / QBO / Procore / Manual / AI |
 
-### Database 6: Payments
+### Microsoft Graph API Integration
 
-| Property | Type | Purpose |
-|----------|------|---------|
-| Payment Reference | Title | Check # or ACH reference |
-| Invoice | Relation | Which invoice(s) this payment covers |
-| Vendor | Relation | Payee |
-| Amount | Number | Payment amount |
-| Payment Date | Date | Date paid |
-| Method | Select | Check / ACH / Wire |
-| QBO Payment ID | Text | QBO transaction reference |
-| Cleared | Checkbox | Bank reconciliation flag |
-| Potential Duplicate | Checkbox | Auto-flagged by dedup engine |
+n8n interacts with the Excel file using the Microsoft Graph API via HTTP Request nodes with OAuth2 credentials.
 
-### 2nd Brain Views
+**Azure App Registration Required:**
+1. Register app in Azure Active Directory
+2. Grant `Files.ReadWrite` and `Sites.ReadWrite.All` permissions
+3. Configure OAuth2 redirect URI for n8n
+4. Store Client ID, Client Secret, and Tenant ID in n8n credentials
 
-1. **PM Dashboard** — Filtered by PM, shows their pending approvals + overdue items
-2. **Duplicate Alert Board** — All flagged duplicates needing review
-3. **Cash Flow Board** — Outstanding receivables by customer
-4. **Project Financial Summary** — Per-project billing status
-5. **Vendor Payment History** — All payments to each vendor (dedup verification)
-6. **Audit Trail** — Complete history of all system actions
+**Key Operations:**
+
+```
+READ pending approvals:
+  GET /drives/{driveId}/items/{fileId}/workbook/tables/PendingApprovals/rows
+
+WRITE new invoice row:
+  POST /drives/{driveId}/items/{fileId}/workbook/tables/PendingApprovals/rows
+  Body: { "values": [["INV-001", "ABC Plumbing", 15000, "Project Alpha", ...]] }
+
+READ PM decisions (polling every 5 minutes):
+  GET /drives/{driveId}/items/{fileId}/workbook/worksheets/PendingApprovals/range(address='G:G')
+  -> Check for "APPROVE" or "HOLD" values
+
+MOVE approved row to Recently Processed:
+  POST /drives/{driveId}/items/{fileId}/workbook/tables/RecentlyProcessed/rows
+  DELETE /drives/{driveId}/items/{fileId}/workbook/tables/PendingApprovals/rows/{index}
+
+WRITE audit log entry:
+  POST /drives/{driveId}/items/{fileId}/workbook/tables/AuditLog/rows
+```
+
+**Polling Interval:** n8n checks the Excel file every 5 minutes for new PM decisions. This balances responsiveness with Graph API rate limits (10,000 requests per 10 minutes).
 
 ---
 
@@ -864,8 +867,8 @@ GET https://quickbooks.api.intuit.com/v3/company/{realmId}/query
   ?query=SELECT * FROM Bill WHERE DocNumber='{invoice_number}'
          AND VendorRef='{vendor_id}'
 Headers: { Authorization: "Bearer {token}" }
-// NOTE: For Option 3 (Full Replacement), n8n replaces SmoothX and DOES create
-// vendor bills. The POST /bill endpoint is used only in Option 3.
+// NOTE: For Option 2 (Full Replacement), n8n replaces SmoothX and DOES create
+// vendor bills. The POST /bill endpoint is used only in Option 2.
 
 // 3. Create customer invoice
 POST https://quickbooks.api.intuit.com/v3/company/{realmId}/invoice
@@ -889,55 +892,69 @@ GET https://quickbooks.api.intuit.com/v3/company/{realmId}/query
          AND TxnDate>='{invoice_date}'
 ```
 
-### 9.3 Notion API Integration
+### 9.3 Microsoft Graph API Integration (Excel/OneDrive)
 
 ```javascript
-// 1. Create invoice entry in Invoice Tracker
-POST https://api.notion.com/v1/pages
+// Authentication: Azure AD OAuth 2.0
+// Token URL: https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token
+// Scopes: Files.ReadWrite, Sites.ReadWrite.All
+// Rate Limit: 10,000 requests per 10 minutes
+
+// 1. Create invoice entry in Pending Approvals tab
+POST https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{file_id}/workbook/tables/PendingApprovals/rows
 Headers: {
-  "Authorization": "Bearer {notion_token}",
-  "Notion-Version": "2022-06-28"
+  "Authorization": "Bearer {graph_token}",
+  "Content-Type": "application/json"
 }
 Body: {
-  "parent": { "database_id": "{invoice_tracker_db_id}" },
-  "properties": {
-    "Invoice ID": { "title": [{ "text": { "content": "{invoice_number}" } }] },
-    "Fingerprint": { "rich_text": [{ "text": { "content": "{hash}" } }] },
-    "Vendor": { "select": { "name": "{vendor_name}" } },
-    "Amount": { "number": {amount} },
-    "Invoice Date": { "date": { "start": "{date}" } },
-    "Status": { "select": { "name": "Received" } },
-    "Procore Commitment": { "rich_text": [{ "text": { "content": "{commitment_id}" } }] },
-    "QBO Bill ID": { "rich_text": [{ "text": { "content": "{qbo_bill_id}" } }] },
-    "Match Confidence": { "select": { "name": "{confidence}" } },
-    "Entry Source": { "select": { "name": "{source}" } }
-  }
+  "values": [[
+    "{invoice_number}",
+    "{vendor_name}",
+    {amount},
+    "{project_name}",
+    "{commitment_id}",
+    "{confidence}",
+    "",
+    "{pm_name}",
+    "{timestamp}",
+    "{fingerprint_hash}",
+    "{qbo_bill_id}",
+    "{source}",
+    ""
+  ]]
 }
 
-// 2. Query for duplicate check
-POST https://api.notion.com/v1/databases/{invoice_tracker_db_id}/query
+// 2. Query for duplicate check — read Fingerprint column from all tabs
+GET https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{file_id}/workbook/worksheets/PendingApprovals/range(address='J:J')
 Headers: {
-  "Authorization": "Bearer {notion_token}",
-  "Notion-Version": "2022-06-28"
+  "Authorization": "Bearer {graph_token}"
 }
-Body: {
-  "filter": {
-    "property": "Fingerprint",
-    "rich_text": { "equals": "{hash}" }
-  }
-}
+// Also check RecentlyProcessed tab for previously processed fingerprints
+GET https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{file_id}/workbook/tables/RecentlyProcessed/rows
+// n8n Code node filters for matching fingerprint
 
-// 3. Update invoice status
-PATCH https://api.notion.com/v1/pages/{page_id}
+// 3. Read PM decisions (5-minute polling)
+GET https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{file_id}/workbook/tables/PendingApprovals/rows
 Headers: {
-  "Authorization": "Bearer {notion_token}",
-  "Notion-Version": "2022-06-28"
+  "Authorization": "Bearer {graph_token}"
+}
+// n8n Code node checks Decision column (G) for "APPROVE" or "HOLD"
+
+// 4. Write audit log entry
+POST https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{file_id}/workbook/tables/AuditLog/rows
+Headers: {
+  "Authorization": "Bearer {graph_token}",
+  "Content-Type": "application/json"
 }
 Body: {
-  "properties": {
-    "Status": { "select": { "name": "Approved" } },
-    "Approval Date": { "date": { "start": "{today}" } }
-  }
+  "values": [[
+    "{timestamp}",
+    "Approved",
+    "{invoice_number}",
+    "{pm_name}",
+    "PM approved invoice via Excel dashboard",
+    "n8n"
+  ]]
 }
 ```
 
@@ -997,58 +1014,83 @@ return [{
 
 ## 10. Implementation Roadmap
 
-> **Note:** This roadmap covers the full Option 2 build (12 weeks). For Option 1, Notion-related tasks are excluded (8 weeks total). For Option 3, Phases 5-6 are added for SmoothX replacement (20 weeks total). See the proposal (`PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md`) for detailed per-option scope and pricing.
+> **Note:** This roadmap covers the Option 1 build (10 weeks, $12,000). For Option 2, Phases 5-6 are added for SmoothX replacement (18 weeks total, $32,000). See the proposal (`PROPOSAL-FRONTLINE-PAYMENT-AUTOMATION.md`) for detailed per-option scope and pricing.
 
-### Phase 1: Foundation (Weeks 1-2)
-- [ ] Set up Notion workspace with all 6 databases *(Options 2/3 only)*
-- [ ] Configure Notion views (PM Dashboard, Duplicate Board, etc.) *(Options 2/3 only)*
+### Phase 1: Foundation (Weeks 1-2) — $3,000
 - [ ] Set up n8n instance (cloud or self-hosted)
-- [ ] Configure OAuth connections: Procore, QBO, Notion *(Notion: Options 2/3 only)*
+- [ ] Azure app registration for Microsoft Graph API (Excel/OneDrive access)
+- [ ] Configure OAuth connections: Procore, QBO, Microsoft Graph
+- [ ] Create Excel approval dashboard file in OneDrive with 4 tabs
+- [ ] Configure Excel tables (Pending Approvals, Recently Processed, Duplicate Alerts, Audit Log)
 - [ ] Test API connectivity for all systems
 - [ ] Import existing vendor list and normalize names
 
-### Phase 2: Dedup Engine (Weeks 3-4)
+### Phase 2: Approval Dashboard (Weeks 3-4) — $4,500
+- [ ] Build n8n workflows for Excel read/write via Graph API
+- [ ] Implement 5-minute polling for PM decisions
+- [ ] Build PM notification emails with Excel dashboard links
+- [ ] Configure human approval gate — nothing hits QBO without PM sign-off
+- [ ] Build duplicate alert email templates
+- [ ] Test approval flow end-to-end: write to Excel -> PM approves -> n8n reads decision
+
+### Phase 3: Dedup Engine + Matching (Weeks 5-7) — $3,000
 - [ ] Build Workflow 1: Invoice Intake & Dedup
 - [ ] Implement 5-layer dedup logic
 - [ ] Configure AI matching node (Claude API)
-- [ ] Test with historical duplicate invoices
-- [ ] Tune matching thresholds based on results
-- [ ] Build duplicate alert email templates
-
-### Phase 3: Matching Engine (Weeks 5-6)
 - [ ] Build Workflow 2: Procore-QBO Matching
 - [ ] Implement commitment matching logic
-- [ ] Build PM approval flow
-- [ ] Test with real Procore commitment data
+- [ ] Test with historical duplicate invoices
+- [ ] Tune matching thresholds based on results
 - [ ] Configure confidence scoring thresholds
 
-### Phase 4: Customer Invoicing (Weeks 7-8)
+### Phase 4: Customer Invoicing & Rollout (Weeks 8-10) — $1,500
 - [ ] Build Workflow 3: Customer Invoice Generation
 - [ ] Build Workflow 4: Follow-Up & Escalation
 - [ ] Configure email templates (invoice, reminders, escalation)
-- [ ] Test end-to-end flow: receive -> match -> invoice -> follow-up
-
-### Phase 5: Rollout & Optimization (Weeks 9-12)
+- [ ] Test end-to-end flow: receive -> match -> approve (Excel) -> invoice -> follow-up
 - [ ] Connect SmoothX sync layer data feed
-- [ ] Historical data migration into Notion *(Options 2/3 only)*
-- [ ] PM training on dashboards and approval workflows
-- [ ] Pilot deployment on one project (Weeks 9-10)
-- [ ] Expand to all active projects (Weeks 11-12)
-- [ ] Monitor and tune AI matching thresholds for 30 days
+- [ ] PM training on Excel dashboard and approval workflows
+- [ ] Pilot deployment on one project, then expand to all active projects
 
-### Estimated Monthly Costs (New Costs Only — Option 2)
+**Option 1 Total: $12,000 / 10 weeks**
+
+### Phase 5: SmoothX Replacement — Bill Sync (Weeks 11-14) — $10,000 *(Option 2 only)*
+- [ ] Build Procore→QBO bill sync workflows in n8n
+- [ ] Build QBO→Procore payment sync workflows
+- [ ] Implement contact/vendor sync
+- [ ] Build cost code mapping
+- [ ] Retention/retainage handling
+
+### Phase 6: SmoothX Replacement — Payments, Retention & Progress (Weeks 15-18) — $10,000 *(Option 2 only)*
+- [ ] Progress claims workflows
+- [ ] Parallel run with SmoothX for validation
+- [ ] SmoothX cutover and decommission
+- [ ] Monitor and tune all workflows for 30 days
+
+**Option 2 Total: $32,000 / 18 weeks**
+
+### Estimated Monthly Run-Rate (Both Options)
 
 | Service | Cost | Notes |
 |---------|------|-------|
 | n8n Cloud (Pro) | ~$50-100/mo | Or self-hosted for $0 |
-| Notion Team | ~$50/mo | ~5 users at $10/user/mo *(Options 2/3 only)* |
-| Claude API | ~$20-50/mo | For AI matching (~500 invoices) |
+| Claude API | ~$20-30/mo | For AI matching (~500 invoices) |
+| Excel/OneDrive | Existing | Already included in Microsoft 365 |
 | Procore | Existing | Already licensed |
 | QBO | Existing | Already licensed |
-| SmoothX | Existing (~$200-500/mo) | Already in budget *(Options 1/2 — eliminated in Option 3)* |
-| **New costs total** | **~$120-200/mo** | Does not include existing SmoothX subscription |
+| SmoothX | Existing | Already in budget *(Option 1 keeps; Option 2 eliminates)* |
+| **New costs total** | **~$70-130/mo** | Does not include existing subscriptions |
 
-**ROI: Even catching one duplicate payment ($15,000) pays for the entire system for years. See proposal for full ROI analysis.**
+### Year 1 Total Cost of Ownership
+
+| | Option 1 | Option 2 |
+|---|---------|---------|
+| Build cost | $12,000 | $32,000 |
+| Monthly run-rate (12 mo) | $840-$1,560 | $840-$1,560 |
+| **Year 1 TCO** | **$12,840-$13,560** | **$32,840-$33,560** |
+| | + existing SmoothX | SmoothX eliminated |
+
+**ROI: Last year, Frontline lost $150,000 to duplicate payments. Even catching one $15,000 duplicate pays for the system's monthly run-rate for years. See proposal for full ROI analysis.**
 
 ---
 
@@ -1078,9 +1120,9 @@ Match Type: {match_type} (Confidence: {confidence}%)
 
 ACTION NEEDED:
 - If this IS a duplicate: No action needed, it has been blocked.
-- If this is NOT a duplicate: Click here to override and process: {notion_link}
+- If this is NOT a duplicate: Click here to review in the approval dashboard: {excel_dashboard_link}
 
-Dashboard: {notion_dashboard_link}
+Dashboard: {excel_dashboard_link}
 
 This alert prevents double/triple payments. If you have questions,
 contact the finance team.
@@ -1111,7 +1153,7 @@ PROCORE MATCH:
 - Remaining After: ${remaining}
 - Match Confidence: {confidence}
 
-APPROVE or REJECT: {notion_approval_link}
+APPROVE or REJECT: Open the Excel approval dashboard and update the Decision column: {excel_dashboard_link}
 
 This invoice will be held until you take action.
 
@@ -1172,7 +1214,7 @@ SmoothX serves as Frontline's integration middleware (Procore↔QBO sync layer).
 
 ### If SmoothX Has REST API:
 - Use n8n HTTP Request node to query job costing data
-- Sync vendor records between SmoothX and Notion
+- Sync vendor records between SmoothX and Excel tracking spreadsheet
 - Pull purchase order data for additional dedup layer
 
 ### If SmoothX Has Database Access Only:
@@ -1198,17 +1240,17 @@ SmoothX serves as Frontline's integration middleware (Procore↔QBO sync layer).
 ### Data Security
 - All API tokens stored in n8n encrypted credentials store
 - OAuth refresh tokens auto-rotated
-- Notion workspace access restricted to finance + PMs
-- Audit log captures all system actions
+- Excel/OneDrive file access restricted to finance + PMs via SharePoint permissions
+- Audit log captures all system actions in Excel Audit Log tab
 
 ### Compliance
-- SOX-compatible audit trail in Notion
+- SOX-compatible audit trail in Excel Audit Log tab
 - Separation of duties: system matches, PM approves, finance pays
 - All duplicate blocks logged with full reasoning
 - AI decisions include confidence scores and are reviewable
 
 ### Backup & Recovery
-- Notion data backed up via API export (scheduled weekly)
+- Excel/OneDrive data backed up via OneDrive version history and SharePoint retention policies
 - n8n workflow definitions exported to Git
 - QBO maintains its own backup (Intuit cloud)
 - Procore maintains its own backup (Procore cloud)

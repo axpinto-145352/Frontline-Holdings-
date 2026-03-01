@@ -6,72 +6,52 @@
         "rule": {
           "interval": [
             {
-              "field": "hours",
-              "hoursInterval": 1
+              "field": "minutes",
+              "minutesInterval": 5
             }
           ]
         }
       },
       "id": "schedule-trigger",
-      "name": "Hourly Check",
+      "name": "Poll Every 5 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1,
       "position": [250, 300],
-      "notes": "Runs every hour to check for approved invoices and overdue follow-ups"
+      "notes": "Polls Excel dashboard every 5 minutes to check for APPROVE/HOLD decisions and overdue follow-ups"
     },
     {
       "parameters": {
-        "resource": "databasePage",
-        "operation": "getAll",
-        "databaseId": "={{ $env.NOTION_INVOICE_TRACKER_DB_ID }}",
-        "filterType": "string",
-        "filters": {
-          "filter": {
-            "property": "Status",
-            "select": {
-              "equals": "Approved"
+        "method": "GET",
+        "url": "=https://graph.microsoft.com/v1.0/me/drive/items/{{ $env.ONEDRIVE_EXCEL_FILE_ID }}/workbook/tables/PendingApprovals/rows",
+        "authentication": "oAuth2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
             }
-          }
-        }
+          ]
+        },
+        "options": {}
       },
       "id": "get-approved-invoices",
-      "name": "Get Approved Invoices",
-      "type": "n8n-nodes-base.notion",
-      "typeVersion": 2,
+      "name": "Read Excel Pending Approvals",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
       "position": [480, 200],
-      "notes": "Query Notion for invoices with status = Approved"
+      "notes": "Read Pending Approvals tab from Excel — filter for rows where Decision = APPROVE"
     },
     {
       "parameters": {
-        "resource": "databasePage",
-        "operation": "getAll",
-        "databaseId": "={{ $env.NOTION_INVOICE_TRACKER_DB_ID }}",
-        "filterType": "string",
-        "filters": {
-          "filter": {
-            "and": [
-              {
-                "property": "Status",
-                "select": {
-                  "equals": "Invoiced to Customer"
-                }
-              },
-              {
-                "property": "Payment Due",
-                "date": {
-                  "before": "={{ new Date().toISOString().split('T')[0] }}"
-                }
-              }
-            ]
-          }
-        }
+        "jsCode": "// Filter for approved invoices and check for escalation timeouts\nconst rows = $input.first().json.value || [];\nconst approved = [];\nconst escalate = [];\nconst now = new Date();\n\nfor (const row of rows) {\n  const values = row.values[0];\n  const decision = (values[9] || '').toString().toUpperCase().trim();\n  const timestamp = new Date(values[11]);\n  const hoursElapsed = (now - timestamp) / (1000 * 60 * 60);\n  \n  if (decision === 'APPROVE') {\n    approved.push({\n      invoice_number: values[0],\n      fingerprint: values[1],\n      vendor_name: values[2],\n      amount: values[3],\n      invoice_date: values[4],\n      project_name: values[5],\n      commitment_number: values[6],\n      match_confidence: values[7],\n      match_score: values[8],\n      pm_email: values[10],\n      row_index: row.index\n    });\n  } else if (decision === '' && hoursElapsed >= 4) {\n    escalate.push({\n      invoice_number: values[0],\n      vendor_name: values[2],\n      amount: values[3],\n      project_name: values[5],\n      pm_email: values[10],\n      hours_pending: hoursElapsed.toFixed(1)\n    });\n  }\n}\n\nreturn [{ json: { approved, escalate } }];"
       },
-      "id": "get-overdue-invoices",
-      "name": "Get Overdue Invoices",
-      "type": "n8n-nodes-base.notion",
+      "id": "filter-decisions",
+      "name": "Filter Decisions & Check Timeouts",
+      "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [480, 450],
-      "notes": "Query Notion for overdue invoices (past Payment Due date)"
+      "position": [710, 200],
+      "notes": "Parse Excel rows: extract APPROVED invoices and check for 4-hour escalation timeout"
     },
     {
       "parameters": {
@@ -96,7 +76,7 @@
       "name": "Create Customer Invoice in QBO",
       "type": "n8n-nodes-base.quickbooks",
       "typeVersion": 1,
-      "position": [710, 200],
+      "position": [940, 100],
       "notes": "Generate customer invoice in QuickBooks Online"
     },
     {
@@ -109,52 +89,92 @@
       "name": "Send Invoice to Customer",
       "type": "n8n-nodes-base.quickbooks",
       "typeVersion": 1,
-      "position": [940, 200],
+      "position": [1170, 100],
       "notes": "Email invoice to customer via QBO native email"
     },
     {
       "parameters": {
-        "resource": "databasePage",
-        "operation": "update",
-        "pageId": "={{ $json.notion_page_id }}",
-        "propertiesUi": {
-          "propertyValues": [
-            { "key": "Status", "selectValue": "Invoiced to Customer" },
-            { "key": "Invoiced Date", "dateValue": "={{ new Date().toISOString().split('T')[0] }}" },
-            { "key": "QBO Invoice ID", "richTextValue": "={{ $node['Create Customer Invoice in QBO'].json.Id }}" }
+        "method": "POST",
+        "url": "=https://graph.microsoft.com/v1.0/me/drive/items/{{ $env.ONEDRIVE_EXCEL_FILE_ID }}/workbook/tables/RecentlyProcessed/rows/add",
+        "authentication": "oAuth2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
-        }
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "values",
+              "value": "=[[\"{{ $json.invoice_number }}\", \"{{ $json.vendor_name }}\", {{ $json.amount }}, \"{{ $json.project_name }}\", \"Invoiced to Customer\", \"{{ $node['Create Customer Invoice in QBO'].json.Id }}\", \"{{ new Date().toISOString() }}\"]]"
+            }
+          ]
+        },
+        "options": {}
       },
-      "id": "update-notion-invoiced",
-      "name": "Update Notion Status",
-      "type": "n8n-nodes-base.notion",
-      "typeVersion": 2,
-      "position": [1170, 200],
-      "notes": "Update Notion entry to Invoiced to Customer"
+      "id": "update-excel-invoiced",
+      "name": "Log to Recently Processed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1400, 100],
+      "notes": "Move processed invoice to Recently Processed tab in Excel dashboard"
     },
     {
       "parameters": {
         "sendTo": "={{ $json.pm_email }}",
         "subject": "=Invoice #{{ $json.invoice_number }} Sent to {{ $json.customer_name }} for ${{ $json.amount }}",
         "emailType": "html",
-        "message": "=<h2>Customer Invoice Sent</h2>\n<p>Invoice #{{ $json.invoice_number }} has been sent to <strong>{{ $json.customer_name }}</strong>.</p>\n<table border='1' cellpadding='8'>\n<tr><td><strong>Amount</strong></td><td>${{ $json.amount }}</td></tr>\n<tr><td><strong>Project</strong></td><td>{{ $json.project_name }}</td></tr>\n<tr><td><strong>Due Date</strong></td><td>{{ $json.payment_due_date }}</td></tr>\n<tr><td><strong>QBO Invoice ID</strong></td><td>{{ $node['Create Customer Invoice in QBO'].json.Id }}</td></tr>\n</table>\n<p>Track status: <a href='{{ $json.notion_link }}'>Notion Dashboard</a></p>\n<p>— Frontline Payment Automation System</p>"
+        "message": "=<h2>Customer Invoice Sent</h2>\n<p>Invoice #{{ $json.invoice_number }} has been sent to <strong>{{ $json.customer_name }}</strong>.</p>\n<table border='1' cellpadding='8'>\n<tr><td><strong>Amount</strong></td><td>${{ $json.amount }}</td></tr>\n<tr><td><strong>Project</strong></td><td>{{ $json.project_name }}</td></tr>\n<tr><td><strong>Due Date</strong></td><td>{{ $json.payment_due_date }}</td></tr>\n<tr><td><strong>QBO Invoice ID</strong></td><td>{{ $node['Create Customer Invoice in QBO'].json.Id }}</td></tr>\n</table>\n<p>Track status in the <a href='{{ $env.EXCEL_DASHBOARD_URL }}'>Excel Dashboard</a>.</p>\n<p>— Frontline Payment Automation System</p>"
       },
       "id": "email-pm-confirmation",
       "name": "Confirm to PM",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2,
-      "position": [1400, 200],
+      "position": [1630, 100],
       "notes": "Email PM confirmation that customer invoice was sent"
     },
     {
       "parameters": {
-        "jsCode": "// Categorize overdue invoices by days overdue\nconst items = $input.all();\nconst results = items.map(item => {\n  const dueDate = new Date(item.json.payment_due_date);\n  const today = new Date();\n  const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));\n  \n  let escalation = 'gentle';\n  if (daysOverdue > 30) escalation = 'escalation';\n  else if (daysOverdue > 15) escalation = 'firm';\n  \n  return {\n    json: {\n      ...item.json,\n      days_overdue: daysOverdue,\n      escalation_level: escalation\n    }\n  };\n});\n\nreturn results;"
+        "sendTo": "={{ $json.pm_email }},{{ $env.FINANCE_TEAM_EMAIL }}",
+        "subject": "=⏰ Invoice Pending Approval for {{ $json.hours_pending }} Hours - {{ $json.vendor_name }} ${{ $json.amount }}",
+        "emailType": "html",
+        "message": "=<h2>Invoice Approval Escalation</h2>\n<p>The following invoice has been <strong>pending approval for {{ $json.hours_pending }} hours</strong> without a decision:</p>\n<table border='1' cellpadding='8'>\n<tr><td><strong>Vendor</strong></td><td>{{ $json.vendor_name }}</td></tr>\n<tr><td><strong>Invoice #</strong></td><td>{{ $json.invoice_number }}</td></tr>\n<tr><td><strong>Amount</strong></td><td>${{ $json.amount }}</td></tr>\n<tr><td><strong>Project</strong></td><td>{{ $json.project_name }}</td></tr>\n</table>\n<p><strong>Action Required:</strong> Open the <a href='{{ $env.EXCEL_DASHBOARD_URL }}'>Excel Dashboard</a> and type APPROVE or HOLD in the Decision column.</p>\n<p>— Frontline Payment Automation System</p>"
+      },
+      "id": "escalation-timeout",
+      "name": "Escalation - No Decision",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [940, 350],
+      "notes": "4-hour timeout: escalate to PM + finance if no APPROVE/HOLD decision made"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://graph.microsoft.com/v1.0/me/drive/items/{{ $env.ONEDRIVE_EXCEL_FILE_ID }}/workbook/tables/RecentlyProcessed/rows",
+        "authentication": "oAuth2",
+        "options": {}
+      },
+      "id": "get-overdue-invoices",
+      "name": "Check Overdue Invoices",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [480, 500],
+      "notes": "Read Recently Processed tab — filter for overdue customer invoices"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Categorize overdue invoices by days overdue\nconst rows = $input.first().json.value || [];\nconst results = [];\n\nfor (const row of rows) {\n  const values = row.values[0];\n  const dueDate = new Date(values[6]); // payment_due_date column\n  const today = new Date();\n  const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));\n  \n  if (daysOverdue <= 0) continue; // not overdue\n  \n  let escalation = 'gentle';\n  if (daysOverdue > 30) escalation = 'escalation';\n  else if (daysOverdue > 15) escalation = 'firm';\n  \n  results.push({\n    json: {\n      invoice_number: values[0],\n      vendor_name: values[1],\n      amount: values[2],\n      project_name: values[3],\n      customer_name: values[4],\n      customer_email: values[5],\n      payment_due_date: values[6],\n      pm_email: values[7],\n      days_overdue: daysOverdue,\n      escalation_level: escalation\n    }\n  });\n}\n\nreturn results;"
       },
       "id": "categorize-overdue",
       "name": "Categorize by Days Overdue",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [710, 450],
+      "position": [710, 500],
       "notes": "Classify overdue invoices: gentle (1-15 days), firm (16-30), escalation (31+)"
     },
     {
@@ -181,7 +201,7 @@
       "name": "Escalation Router",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [940, 450],
+      "position": [940, 500],
       "notes": "Route to appropriate follow-up template"
     },
     {
@@ -195,7 +215,7 @@
       "name": "Gentle Reminder",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2,
-      "position": [1170, 350],
+      "position": [1170, 400],
       "notes": "1-15 days overdue: gentle reminder to customer"
     },
     {
@@ -210,7 +230,7 @@
       "name": "Firm Reminder",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2,
-      "position": [1170, 450],
+      "position": [1170, 500],
       "notes": "16-30 days overdue: firm reminder, CC PM"
     },
     {
@@ -218,38 +238,44 @@
         "sendTo": "={{ $json.pm_email }},{{ $env.FINANCE_TEAM_EMAIL }}",
         "subject": "=🔴 ESCALATION: Invoice #{{ $json.invoice_number }} - {{ $json.days_overdue }} Days Overdue (${{ $json.amount }})",
         "emailType": "html",
-        "message": "=<h2>Payment Escalation Alert</h2>\n<p>The following invoice is <strong>{{ $json.days_overdue }} days overdue</strong> and requires immediate attention:</p>\n<table border='1' cellpadding='8'>\n<tr><td><strong>Customer</strong></td><td>{{ $json.customer_name }}</td></tr>\n<tr><td><strong>Invoice #</strong></td><td>{{ $json.invoice_number }}</td></tr>\n<tr><td><strong>Amount</strong></td><td>${{ $json.amount }}</td></tr>\n<tr><td><strong>Project</strong></td><td>{{ $json.project_name }}</td></tr>\n<tr><td><strong>Due Date</strong></td><td>{{ $json.payment_due_date }}</td></tr>\n<tr><td><strong>Days Overdue</strong></td><td>{{ $json.days_overdue }}</td></tr>\n<tr><td><strong>Follow-ups Sent</strong></td><td>{{ $json.followup_count }}</td></tr>\n</table>\n<p><strong>Action Required:</strong> Please escalate with the customer directly.</p>\n<p>— Frontline Payment Automation System</p>"
+        "message": "=<h2>Payment Escalation Alert</h2>\n<p>The following invoice is <strong>{{ $json.days_overdue }} days overdue</strong> and requires immediate attention:</p>\n<table border='1' cellpadding='8'>\n<tr><td><strong>Customer</strong></td><td>{{ $json.customer_name }}</td></tr>\n<tr><td><strong>Invoice #</strong></td><td>{{ $json.invoice_number }}</td></tr>\n<tr><td><strong>Amount</strong></td><td>${{ $json.amount }}</td></tr>\n<tr><td><strong>Project</strong></td><td>{{ $json.project_name }}</td></tr>\n<tr><td><strong>Due Date</strong></td><td>{{ $json.payment_due_date }}</td></tr>\n<tr><td><strong>Days Overdue</strong></td><td>{{ $json.days_overdue }}</td></tr>\n</table>\n<p><strong>Action Required:</strong> Please escalate with the customer directly.</p>\n<p>— Frontline Payment Automation System</p>"
       },
       "id": "escalation-alert",
       "name": "Escalation Alert",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2,
-      "position": [1170, 550],
+      "position": [1170, 600],
       "notes": "31+ days overdue: escalation to PM + finance team"
     }
   ],
   "connections": {
-    "Hourly Check": {
+    "Poll Every 5 Minutes": {
       "main": [
         [
-          { "node": "Get Approved Invoices", "type": "main", "index": 0 },
-          { "node": "Get Overdue Invoices", "type": "main", "index": 0 }
+          { "node": "Read Excel Pending Approvals", "type": "main", "index": 0 },
+          { "node": "Check Overdue Invoices", "type": "main", "index": 0 }
         ]
       ]
     },
-    "Get Approved Invoices": {
-      "main": [[{ "node": "Create Customer Invoice in QBO", "type": "main", "index": 0 }]]
+    "Read Excel Pending Approvals": {
+      "main": [[{ "node": "Filter Decisions & Check Timeouts", "type": "main", "index": 0 }]]
+    },
+    "Filter Decisions & Check Timeouts": {
+      "main": [
+        [{ "node": "Create Customer Invoice in QBO", "type": "main", "index": 0 }],
+        [{ "node": "Escalation - No Decision", "type": "main", "index": 0 }]
+      ]
     },
     "Create Customer Invoice in QBO": {
       "main": [[{ "node": "Send Invoice to Customer", "type": "main", "index": 0 }]]
     },
     "Send Invoice to Customer": {
-      "main": [[{ "node": "Update Notion Status", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Log to Recently Processed", "type": "main", "index": 0 }]]
     },
-    "Update Notion Status": {
+    "Log to Recently Processed": {
       "main": [[{ "node": "Confirm to PM", "type": "main", "index": 0 }]]
     },
-    "Get Overdue Invoices": {
+    "Check Overdue Invoices": {
       "main": [[{ "node": "Categorize by Days Overdue", "type": "main", "index": 0 }]]
     },
     "Categorize by Days Overdue": {
